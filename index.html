@@ -454,6 +454,7 @@ const PAYMENT_ALIASES = {
   transferencia: ['transferência','transferencia','ted','doc'],
 };
 const LS_KEY = 'orcamentoCabreraState_v1';
+const LS_BACKUP_KEY = 'orcamentoCabreraStateBackup_v1';
 
 /* =========================================================
    ESTADO / STORE
@@ -515,6 +516,19 @@ function loadState(){
 function saveState(opts={}){
   state.updatedAt = Date.now();
   rebuildCategoriesFromState();
+  // Rede de segurança: antes de sobrescrever o localStorage, guarda uma cópia
+  // do que estava salvo — desde que ela tivesse lançamentos. Isso garante que
+  // sempre exista um "último estado bom conhecido" para recuperação manual,
+  // mesmo que algum bug futuro zere os lançamentos por engano.
+  try{
+    const atual = localStorage.getItem(LS_KEY);
+    if(atual){
+      const atualParsed = JSON.parse(atual);
+      if(atualParsed.lancamentos && atualParsed.lancamentos.length){
+        localStorage.setItem(LS_BACKUP_KEY, atual);
+      }
+    }
+  }catch(e){ /* backup é best-effort, nunca deve travar o salvamento */ }
   localStorage.setItem(LS_KEY, JSON.stringify(state));
   if(!opts.skipSync) syncPushDebounced();
   renderAll();
@@ -2610,6 +2624,17 @@ function renderConfig(){
         <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">Importar backup</button>
       </div>
       <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importarBackup(event)">
+      ${(function(){
+        try{
+          const raw = localStorage.getItem(LS_BACKUP_KEY);
+          if(!raw) return '';
+          const b = JSON.parse(raw);
+          const n = (b.lancamentos||[]).length;
+          const quando = b.updatedAt ? new Date(b.updatedAt).toLocaleString('pt-BR') : '—';
+          return `<div class="insight" style="margin-top:12px;"><span class="icon">🛟</span><span>Backup automático deste aparelho disponível: <b>${n} lançamento(s)</b>, salvo em ${quando}.</span></div>
+          <button class="btn btn-secondary" style="margin-top:8px;" onclick="restaurarBackupAutomatico()">Restaurar backup automático</button>`;
+        }catch(e){ return ''; }
+      })()}
     </div>
 
     <div class="card settings-group" style="margin-bottom:0;">
@@ -2803,6 +2828,20 @@ function importarBackup(ev){
   };
   reader.readAsText(f);
 }
+function restaurarBackupAutomatico(){
+  try{
+    const raw = localStorage.getItem(LS_BACKUP_KEY);
+    if(!raw){ showToast('Nenhum backup automático encontrado'); return; }
+    const backup = JSON.parse(raw);
+    if(!confirm(`Restaurar o backup automático com ${((backup.lancamentos||[]).length)} lançamento(s)? Isso substitui os dados atuais deste aparelho.`)) return;
+    const def = defaultState();
+    state = { ...def, ...backup, settings: { ...def.settings, ...(backup.settings||{}) } };
+    state.updatedAt = Date.now();
+    saveState();
+    showToast('Backup automático restaurado ✓');
+    renderConfig();
+  }catch(e){ console.error(e); showToast('Não consegui restaurar o backup automático'); }
+}
 
 /* =========================================================
    SINCRONIZAÇÃO (Firebase Firestore — opcional)
@@ -2825,9 +2864,21 @@ async function connectFirebase(cfg){
     if(!snap.exists) return;
     const remote = snap.data();
     if(remote && remote.updatedAt && remote.updatedAt > state.updatedAt){
+      const remoteLancamentos = remote.lancamentos || [];
+      // Rede de segurança: nunca aceitar uma versão remota que apagaria
+      // lançamentos que já temos localmente. Isso pode acontecer se outro
+      // aparelho carregou o app com o armazenamento local vazio/corrompido
+      // e empurrou um estado vazio por engano. Nesse caso, ignora o remoto
+      // e re-empurra o nosso estado local (que tem mais dados) para a nuvem,
+      // corrigindo o documento remoto em vez de aceitar a perda.
+      if(state.lancamentos.length > 0 && remoteLancamentos.length === 0){
+        console.warn('Sync: ignorando snapshot remoto vazio para não apagar lançamentos locais. Reenviando estado local.');
+        syncPush().catch(e=>console.error('sync re-push', e));
+        return;
+      }
       state = {
         ...state,
-        lancamentos: remote.lancamentos || [],
+        lancamentos: remoteLancamentos,
         potes: remote.potes || state.potes,
         movimentosPoupanca: remote.movimentosPoupanca || state.movimentosPoupanca,
         categorias: (remote.categorias && remote.categorias.length) ? remote.categorias : state.categorias,
@@ -2848,6 +2899,22 @@ async function syncPush(){
   if(!fbDb || !state.settings.firebase) return;
   const cfg = state.settings.firebase;
   const docRef = fbDb.collection('familias').doc(cfg.familyCode);
+  // Rede de segurança: antes de sobrescrever a nuvem, confere o que já está
+  // lá. Se o local está vazio mas a nuvem tem lançamentos, isso é sinal de
+  // que este aparelho carregou com armazenamento local vazio/corrompido —
+  // nunca deve apagar os dados da família inteira. Aborta o push nesse caso.
+  if(state.lancamentos.length === 0){
+    try{
+      const snap = await docRef.get();
+      if(snap.exists){
+        const remote = snap.data();
+        if(remote && remote.lancamentos && remote.lancamentos.length > 0){
+          console.warn('Sync: abortando push vazio — a nuvem já tem lançamentos e este aparelho está sem dados locais.');
+          return;
+        }
+      }
+    }catch(e){ console.error('sync guard check', e); }
+  }
   await docRef.set({
     lancamentos: state.lancamentos,
     potes: state.potes,
