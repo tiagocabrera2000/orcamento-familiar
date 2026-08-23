@@ -1,0 +1,2550 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orçamento da Família Cabrera</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --surface-2: #f9f9f7;
+    --surface-card: #ffffff;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --gridline: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --border-strong: rgba(11,11,11,0.16);
+
+    --series-1: #2a78d6; /* Casa */
+    --series-2: #eb6834; /* Tiago pessoal */
+    --series-3: #1baf7a; /* Diva */
+    --series-4: #eda100; /* Pedro */
+    --series-5: #e87ba4; /* Luciana pessoal */
+    --series-6: #008300; /* Mercado */
+    --series-7: #4a3aa7; /* Lazer */
+    --series-8: #e34948; /* Transporte */
+    --series-other: #898781; /* Outros (fold) */
+
+    --good: #0ca30c;
+    --good-text: #006300;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+
+    --radius-card: 16px;
+    --radius-control: 10px;
+    --shadow-card: 0 1px 2px rgba(11,11,11,0.06), 0 1px 8px rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --surface-2: #0d0d0d;
+      --surface-card: #232322;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --gridline: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --border-strong: rgba(255,255,255,0.18);
+
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --series-5: #d55181;
+      --series-6: #008300;
+      --series-7: #9085e9;
+      --series-8: #e66767;
+      --series-other: #898781;
+
+      --good: #0ca30c;
+      --good-text: #0ca30c;
+      --warning: #fab219;
+      --serious: #ec835a;
+      --critical: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --surface-2: #0d0d0d;
+    --surface-card: #232322;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255,255,255,0.10);
+    --border-strong: rgba(255,255,255,0.18);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+    --series-other: #898781;
+    --good: #0ca30c;
+    --good-text: #0ca30c;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #e66767;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface-2);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 84px;
+  }
+  h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+  p { margin: 0; }
+  button { font-family: inherit; }
+  input, select, textarea { font-family: inherit; font-size: 16px; }
+
+  .app { max-width: 640px; margin: 0 auto; padding: 16px; }
+  .app-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 4px 16px;
+  }
+  .app-header h1 { font-size: 19px; }
+  .app-header .subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .sync-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; background: var(--text-muted); }
+  .sync-dot.on { background: var(--good); }
+  .sync-badge { display: flex; align-items: center; font-size: 11px; color: var(--text-muted); cursor: pointer; padding: 6px 10px; border-radius: 999px; background: var(--surface-card); border: 1px solid var(--border); }
+
+  .card {
+    background: var(--surface-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+  .card h2 { font-size: 14px; color: var(--text-secondary); font-weight: 600; margin-bottom: 10px; }
+  .card h2 .hint { font-weight: 400; color: var(--text-muted); }
+
+  .hero-balance { text-align: left; }
+  .hero-balance .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+  .hero-balance .value { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; margin-top: 4px; line-height: 1.05; }
+  .hero-balance .value.neg { color: var(--critical); }
+  .hero-balance .value.pos { color: var(--text-primary); }
+  .hero-balance .sub { font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
+  .hero-balance .period-nav { display:flex; align-items:center; gap:8px; margin-top:14px; }
+  .period-nav button { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; width: 30px; height: 30px; color: var(--text-primary); font-size: 15px; cursor:pointer; }
+  .period-nav .period-label { font-size: 13px; font-weight: 600; color: var(--text-primary); flex:1; text-align:center; }
+
+  .meter-row { display:flex; align-items:center; gap:10px; margin-top: 12px; }
+  .meter-track { flex:1; height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; border: 1px solid var(--border); }
+  .meter-fill { height: 100%; border-radius: 999px; }
+  .meter-label { font-size: 11px; color: var(--text-muted); min-width: 78px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .stat-tile { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+  .stat-tile .stat-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .stat-tile .stat-value { font-size: 19px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .stat-tile .stat-value.crit { color: var(--critical); }
+  .stat-tile .stat-value.good { color: var(--good-text); }
+
+  .cat-list { display: flex; flex-direction: column; gap: 12px; }
+  .cat-row { display: flex; flex-direction: column; gap: 4px; }
+  .cat-row .top { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; }
+  .cat-row .top .name { display:flex; align-items:center; gap:7px; font-weight: 600; color: var(--text-primary); }
+  .cat-swatch { width: 9px; height: 9px; border-radius: 3px; flex-shrink:0; }
+  .cat-row .top .nums { color: var(--text-secondary); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .cat-row .top .nums b { color: var(--text-primary); }
+  .cat-row .track { height: 7px; border-radius: 999px; background: var(--surface-2); border:1px solid var(--border); overflow:hidden; }
+  .cat-row .track .fill { height: 100%; border-radius: 999px; }
+  .cat-row .over-note { font-size: 11px; color: var(--critical); }
+
+  .insight { display:flex; gap:10px; padding: 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); font-size: 13px; line-height:1.45; margin-top:8px;}
+  .insight .icon { font-size: 15px; flex-shrink:0; }
+  .insight.warn { border-color: color-mix(in srgb, var(--warning) 40%, var(--border)); }
+  .insight.crit { border-color: color-mix(in srgb, var(--critical) 40%, var(--border)); }
+  .insight.good { border-color: color-mix(in srgb, var(--good) 40%, var(--border)); }
+  .insight b { color: var(--text-primary); }
+
+  nav.tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface-card); border-top: 1px solid var(--border);
+    display: flex; padding: 6px max(6px, env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom));
+    z-index: 40;
+  }
+  nav.tabbar button {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: none; border: none; color: var(--text-muted); font-size: 10.5px; font-weight: 600;
+    padding: 6px 2px; cursor: pointer; border-radius: 10px;
+  }
+  nav.tabbar button .ic { font-size: 19px; }
+  nav.tabbar button.active { color: var(--series-1); }
+
+  .view { display: none; }
+  .view.active { display: block; animation: fadein .15s ease; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(4px);} to { opacity:1; transform:none; } }
+
+  .fab {
+    position: fixed; right: 18px; bottom: 78px; z-index: 41;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--series-1); color: #fff; border: none;
+    font-size: 26px; box-shadow: 0 4px 14px rgba(0,0,0,0.25); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .sheet-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 60;
+    display: none; align-items: flex-end; justify-content: center;
+  }
+  .sheet-backdrop.open { display: flex; }
+  .sheet {
+    background: var(--surface-1); width: 100%; max-width: 640px;
+    border-radius: 20px 20px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
+    max-height: 92vh; overflow-y: auto;
+  }
+  .sheet-handle { width: 36px; height: 4px; border-radius: 3px; background: var(--baseline); margin: 0 auto 14px; }
+  .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .sheet-header h3 { font-size: 17px; }
+  .sheet-close { background: var(--surface-2); border: 1px solid var(--border); border-radius: 50%; width: 30px; height: 30px; color: var(--text-secondary); font-size: 16px; cursor: pointer; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+  .field input[type=text], .field input[type=number], .field input[type=date], .field select, .field textarea {
+    width: 100%; padding: 11px 12px; border-radius: var(--radius-control); border: 1px solid var(--border-strong);
+    background: var(--surface-card); color: var(--text-primary);
+  }
+  .field textarea { resize: vertical; min-height: 54px; }
+  .field .hint { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+  .chip-group { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    padding: 8px 13px; border-radius: 999px; border: 1px solid var(--border-strong);
+    background: var(--surface-card); color: var(--text-secondary); font-size: 13px; font-weight: 600;
+    cursor: pointer; display:flex; align-items:center; gap:6px;
+  }
+  .chip .dot { width:8px; height:8px; border-radius: 50%; }
+  .chip.selected { background: var(--text-primary); color: var(--surface-1); border-color: var(--text-primary); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .amount-input { font-size: 30px; font-weight: 700; text-align:left; border: none !important; background: none !important; padding: 4px 0 !important; }
+  .amount-wrap { display:flex; align-items:baseline; gap:6px; border-bottom: 2px solid var(--border-strong); padding-bottom:6px; }
+  .amount-wrap .prefix { font-size: 20px; color: var(--text-muted); font-weight:600; }
+
+  .btn { display: inline-flex; align-items:center; justify-content:center; gap:8px; padding: 12px 16px; border-radius: 12px; border: none; font-size: 14.5px; font-weight: 650; cursor: pointer; width: 100%; }
+  .btn-primary { background: var(--text-primary); color: var(--surface-1); }
+  .btn-secondary { background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border-strong); }
+  .btn-ghost { background: none; color: var(--text-secondary); }
+  .btn-danger { background: var(--critical); color: #fff; }
+  .btn-row { display:flex; gap:10px; }
+  .btn[disabled] { opacity: .5; pointer-events:none; }
+
+  .mic-btn {
+    width: 100%; padding: 14px; border-radius: 14px; border: 1.5px dashed var(--border-strong);
+    background: var(--surface-2); color: var(--text-secondary); font-weight: 600; font-size: 13.5px;
+    display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; margin-bottom: 14px;
+  }
+  .mic-btn.listening { background: color-mix(in srgb, var(--critical) 12%, var(--surface-2)); border-color: var(--critical); color: var(--critical); }
+  .mic-pulse { width: 10px; height:10px; border-radius:50%; background: var(--critical); display:none; }
+  .mic-btn.listening .mic-pulse { display:inline-block; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%{ opacity:1; transform:scale(1);} 50%{ opacity:.4; transform:scale(1.5);} 100%{opacity:1; transform:scale(1);} }
+  .voice-transcript { font-size: 12px; color: var(--text-muted); text-align:center; margin: -6px 0 14px; min-height: 14px; }
+
+  .segmented { display:flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 3px; margin-bottom: 14px; }
+  .segmented button { flex:1; padding: 9px; border-radius: 9px; border: none; background: none; color: var(--text-secondary); font-weight: 650; font-size: 13px; cursor:pointer; }
+  .segmented button.active { background: var(--surface-card); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+
+  .upload-drop { border: 1.5px dashed var(--border-strong); border-radius: 14px; padding: 22px 14px; text-align:center; color: var(--text-muted); font-size: 12.5px; cursor:pointer; margin-bottom: 12px; background: var(--surface-2); }
+  .upload-drop b { color: var(--text-secondary); display:block; margin-bottom:3px; font-size: 13.5px; }
+
+  .txn-item { display:flex; align-items:center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--gridline); cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; width:100%; text-align:left; font:inherit; -webkit-tap-highlight-color: rgba(0,0,0,0.06); }
+  .txn-item:last-child { border-bottom: none; }
+  .txn-item:active { opacity:0.7; }
+  .txn-chevron { color: var(--text-muted); font-size: 14px; flex-shrink:0; }
+  .txn-icon { width: 36px; height:36px; border-radius: 10px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; color:#fff; }
+  .txn-mid { flex: 1; min-width:0; }
+  .txn-desc { font-size: 13.5px; font-weight: 600; color: var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .txn-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+  .txn-val { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink:0; }
+  .txn-val.income { color: var(--good-text); }
+
+  .filter-bar { display:flex; gap:8px; overflow-x:auto; padding-bottom: 4px; margin-bottom: 14px; -webkit-overflow-scrolling: touch; }
+  .filter-bar::-webkit-scrollbar { display:none; }
+  .filter-pill { flex-shrink:0; padding: 7px 13px; border-radius: 999px; background: var(--surface-card); border: 1px solid var(--border); font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor:pointer; white-space:nowrap; }
+  .filter-pill.active { background: var(--text-primary); color: var(--surface-1); border-color: var(--text-primary); }
+
+  .legend { display:flex; flex-wrap:wrap; gap: 12px 16px; margin-top: 14px; }
+  .legend-item { display:flex; align-items:center; gap:6px; font-size: 12px; color: var(--text-secondary); }
+  .legend-swatch { width: 9px; height:9px; border-radius: 3px; }
+
+  .empty-state { text-align:center; padding: 30px 10px; color: var(--text-muted); font-size: 13px; }
+  .empty-state .ic { font-size: 30px; margin-bottom: 8px; }
+
+  table.table-view { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 10px; }
+  table.table-view th { text-align:left; color: var(--text-muted); font-weight:600; font-size: 11px; text-transform:uppercase; letter-spacing:.03em; padding: 6px 8px; border-bottom: 1px solid var(--gridline); }
+  table.table-view td { padding: 8px; border-bottom: 1px solid var(--gridline); color: var(--text-secondary); }
+  table.table-view td.num { text-align:right; font-variant-numeric: tabular-nums; color: var(--text-primary); font-weight:600; }
+
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--text-primary); color: var(--surface-1); padding: 11px 18px; border-radius: 999px; font-size: 13px; font-weight:600; z-index:90; box-shadow: 0 4px 14px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition: opacity .2s, transform .2s; }
+  .toast.show { opacity:1; transform: translateX(-50%) translateY(-6px); }
+
+  .sim-result { border-radius: 14px; padding: 16px; margin-top: 14px; background: var(--surface-2); border: 1px solid var(--border); }
+  .sim-result .sim-headline { font-size: 15px; font-weight: 700; display:flex; align-items:center; gap:8px; }
+  .sim-result.ok .sim-headline { color: var(--good-text); }
+  .sim-result.warn .sim-headline { color: color-mix(in srgb, var(--warning) 65%, var(--text-primary)); }
+  .sim-result.crit .sim-headline { color: var(--critical); }
+
+  select.field-select { -webkit-appearance:none; appearance:none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23898781'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position: right 14px center; }
+
+  .settings-group { margin-bottom: 22px; }
+  .settings-group h3 { font-size: 12.5px; text-transform:uppercase; letter-spacing:.04em; color: var(--text-muted); margin-bottom: 10px; }
+  .settings-row { display:flex; justify-content:space-between; align-items:center; padding: 12px 0; border-bottom: 1px solid var(--gridline); gap: 10px; }
+  .settings-row:last-child { border-bottom:none; }
+  .settings-row .st-label { font-size: 13.5px; font-weight:600; }
+  .settings-row .st-sub { font-size: 11.5px; color: var(--text-muted); margin-top:2px; }
+  .settings-row input[type=number], .settings-row input[type=text] { width: 110px; text-align:right; padding: 8px 10px; border-radius:8px; border:1px solid var(--border-strong); background: var(--surface-card); color: var(--text-primary); }
+
+  .link-btn { background:none; border:none; color: var(--series-1); font-weight:600; font-size: 13px; cursor:pointer; padding: 0; }
+  code.inline { background: var(--surface-2); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="app-header">
+    <div>
+      <h1>💰 Orçamento Cabrera</h1>
+      <div class="subtitle" id="headerSubtitle">Carregando…</div>
+    </div>
+    <div class="sync-badge" id="syncBadge" onclick="showView('config')">
+      <span class="sync-dot" id="syncDot"></span><span id="syncLabel">Só neste aparelho</span>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section class="view active" id="view-dashboard"></section>
+
+  <!-- LANÇAR -->
+  <section class="view" id="view-lancar"></section>
+
+  <!-- SIMULADOR -->
+  <section class="view" id="view-simulador"></section>
+
+  <!-- RELATORIOS -->
+  <section class="view" id="view-relatorios"></section>
+
+  <!-- POUPANÇA -->
+  <section class="view" id="view-poupanca"></section>
+
+  <!-- CONFIG -->
+  <section class="view" id="view-config"></section>
+
+</div>
+
+<button class="fab" onclick="openQuickAdd()" aria-label="Novo lançamento">＋</button>
+
+<nav class="tabbar">
+  <button class="tab-btn active" data-view="dashboard" onclick="showView('dashboard')"><span class="ic">🏠</span>Início</button>
+  <button class="tab-btn" data-view="lancar" onclick="showView('lancar')"><span class="ic">✍️</span>Lançar</button>
+  <button class="tab-btn" data-view="simulador" onclick="showView('simulador')"><span class="ic">🔮</span>Simular</button>
+  <button class="tab-btn" data-view="relatorios" onclick="showView('relatorios')"><span class="ic">📊</span>Relatórios</button>
+  <button class="tab-btn" data-view="poupanca" onclick="showView('poupanca')"><span class="ic">🐷</span>Poupança</button>
+  <button class="tab-btn" data-view="config" onclick="showView('config')"><span class="ic">⚙️</span>Ajustes</button>
+</nav>
+
+<div class="sheet-backdrop" id="sheetBackdrop" onclick="if(event.target===this) closeSheet()">
+  <div class="sheet" id="sheetContent"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+/* =========================================================
+   CONSTANTES
+========================================================= */
+/* Categorias: ponto de partida (seed). A partir daqui, a lista "de verdade" mora em
+   state.categorias — editável pelo usuário (criar/renomear/trocar ícone/excluir).
+   'variavel' (renda) e 'outros' (destino de itens órfãos) são fixas e não podem ser
+   excluídas. As variáveis CATEGORIES/CAT_MAP/FLEX_CATEGORIES abaixo são espelhos
+   mutáveis, recalculados por rebuildCategoriesFromState() sempre que a lista muda —
+   assim todo o resto do código (que já lê CATEGORIES/CAT_MAP em dezenas de lugares)
+   continua funcionando sem precisar ser reescrito. */
+const CATEGORIES_SEED = [
+  { key:'casa',        label:'Casa',               icon:'🏠', color:'--series-1', fixa:false },
+  { key:'tiago',       label:'Tiago (pessoal)',     icon:'🧔', color:'--series-2', fixa:false },
+  { key:'diva',        label:'Diva (pet)',          icon:'🐶', color:'--series-3', fixa:false },
+  { key:'pedro',       label:'Pedro (filho)',       icon:'🧒', color:'--series-4', fixa:false },
+  { key:'luciana',     label:'Luciana (pessoal)',   icon:'👩', color:'--series-5', fixa:false },
+  { key:'mercado',     label:'Mercado',             icon:'🛒', color:'--series-6', fixa:false },
+  { key:'lazer',       label:'Lazer',               icon:'🎉', color:'--series-7', fixa:false },
+  { key:'transporte',  label:'Transporte',          icon:'🚗', color:'--series-8', fixa:false },
+  { key:'saude',       label:'Saúde',               icon:'⚕️', color:'--series-other', fixa:false },
+  { key:'educacao',    label:'Educação',            icon:'📚', color:'--series-other', fixa:false },
+  { key:'assinaturas', label:'Assinaturas',         icon:'📱', color:'--series-other', fixa:false },
+  { key:'variavel',    label:'Renda variável',      icon:'💵', color:'--good', fixa:true },
+  { key:'outros',      label:'Outros',              icon:'🔖', color:'--series-other', fixa:true },
+];
+const CATEGORY_ICON_CHOICES = ['🏠','🧔','👩','🧒','🐶','🐱','🛒','🎉','🚗','⚕️','📚','📱','💼','🎁','✈️','🍔','⚽','💇','🔧','🐾','💡','🔖'];
+const SERIES_SLOTS = ['--series-1','--series-2','--series-3','--series-4','--series-5','--series-6','--series-7','--series-8'];
+let CATEGORIES = CATEGORIES_SEED;
+let CAT_MAP = Object.fromEntries(CATEGORIES.map(c=>[c.key,c]));
+let FLEX_CATEGORIES = ['lazer','mercado','transporte','assinaturas','outros'];
+function slotForIndex(i){ return i < SERIES_SLOTS.length ? SERIES_SLOTS[i] : '--series-other'; }
+function rebuildCategoriesFromState(){
+  const custom = (state.categorias||[]).filter(c=>c.key!=='variavel');
+  let slotIdx = 0;
+  const semCorFixa = custom.map(c=>{
+    if(c.key==='outros') return c; // Outros sempre usa --series-other, atribuído abaixo
+    const color = slotForIndex(slotIdx++);
+    return { ...c, color };
+  }).map(c=> c.key==='outros' ? { ...c, color:'--series-other' } : c);
+  const variavel = CATEGORIES_SEED.find(c=>c.key==='variavel');
+  CATEGORIES = [...semCorFixa, variavel];
+  CAT_MAP = Object.fromEntries(CATEGORIES.map(c=>[c.key,c]));
+  const naoFlex = ['diva','pedro','tiago','luciana','casa','saude','educacao','variavel'];
+  FLEX_CATEGORIES = CATEGORIES.filter(c=>c.key!=='variavel' && !naoFlex.includes(c.key)).map(c=>c.key);
+  if(FLEX_CATEGORIES.length===0) FLEX_CATEGORIES = CATEGORIES.filter(c=>c.key!=='variavel').map(c=>c.key);
+}
+const PEOPLE = [
+  { key:'tiago', label:'Tiago', icon:'🧔' },
+  { key:'luciana', label:'Luciana', icon:'👩' },
+  { key:'ambos', label:'Ambos', icon:'🧔👩' },
+];
+const PAYMENT_TYPES = [
+  { key:'pix',           label:'Pix',            icon:'⚡', timing:'imediato' },
+  { key:'debito',        label:'Débito',         icon:'💳', timing:'imediato' },
+  { key:'dinheiro',      label:'Dinheiro',       icon:'💵', timing:'imediato' },
+  { key:'transferencia', label:'Transferência',  icon:'🔁', timing:'imediato' },
+  { key:'boleto',        label:'Boleto',         icon:'🧾', timing:'vencimento' },
+  { key:'cartao',        label:'Cartão de crédito', icon:'💳', timing:'fatura' },
+];
+const PAYMENT_TYPE_MAP = Object.fromEntries(PAYMENT_TYPES.map(p=>[p.key,p]));
+const PAYMENT_METHODS = PAYMENT_TYPES.map(p=>p.label); // usado só para exibição/compat
+const CATEGORY_ALIASES = {
+  casa: ['casa','aluguel','condomínio','condominio','luz','energia','água','agua','internet','moradia','gás','gas','iptu','financiamento'],
+  mercado: ['mercado','supermercado','feira','padaria','hortifruti','açougue'],
+  lazer: ['lazer','cinema','bar','restaurante','viagem','passeio','show','ingresso','balada','happy hour'],
+  transporte: ['transporte','uber','99','combustível','combustivel','gasolina','estacionamento','ônibus','onibus','táxi','taxi','pedágio','pedagio'],
+  diva: ['diva','cachorro','cachorra','pet','veterinário','veterinario','ração','racao','petshop'],
+  pedro: ['pedro','filho','escola','fralda','brinquedo','pediatra','creche'],
+  saude: ['saúde','saude','farmácia','farmacia','remédio','remedio','médico','medico','plano de saúde','plano de saude','exame'],
+  educacao: ['educação','educacao','curso','livro','faculdade','mensalidade escolar','material escolar'],
+  assinaturas: ['assinatura','netflix','spotify','streaming','amazon prime','icloud','mensalidade app'],
+};
+const PAYMENT_ALIASES = {
+  cartao: ['cartão de crédito','cartao de credito','crédito','credito','cartão','cartao'],
+  debito: ['débito','debito'],
+  pix: ['pix'],
+  dinheiro: ['dinheiro','espécie','especie'],
+  boleto: ['boleto'],
+  transferencia: ['transferência','transferencia','ted','doc'],
+};
+const LS_KEY = 'orcamentoCabreraState_v1';
+
+/* =========================================================
+   ESTADO / STORE
+========================================================= */
+function defaultState(){
+  return {
+    // {id,tipo,valor,descricao,categoria,quem,forma,formaTipo,data,dataCaixa,mesRef,parcela,origem,anexoNome,anexoData,criadoEm}
+    lancamentos: [],
+    potes: [], // {id,nome,icone,taxaMensalPct,saldoBase,dataBase}
+    movimentosPoupanca: [], // {id,poteId,tipo:'aporte'|'resgate',valor,data,origem,criadoEm}
+    // {key,label,icon,fixa} — cor é recalculada em rebuildCategoriesFromState(), não é salva aqui
+    categorias: CATEGORIES_SEED.map(c=>({ key:c.key, label:c.label, icon:c.icon, fixa:c.fixa })),
+    // {id,nome,diaFechamento,diaVencimento} — um por cartão físico; lançamentos guardam cartaoId
+    cartoes: [ { id: 'cartao-1', nome: 'Cartão de crédito', diaFechamento: 22, diaVencimento: 5 } ],
+    settings: {
+      rendaFixa: [
+        { id: uid(), dia: 15, valor: 15940, desc: 'Salário (1ª parcela)' },
+        { id: uid(), dia: 30, valor: 14494, desc: 'Salário (2ª parcela)' },
+      ],
+      orcamento: Object.fromEntries(CATEGORIES_SEED.filter(c=>c.key!=='variavel').map(c=>[c.key, 0])),
+      contaCorrente: { saldoInicial: 0, dataReferencia: todayISO(), configurado: false },
+      firebase: null, // {apiKey, authDomain, projectId, appId, familyCode}
+      theme: 'auto',
+    },
+    updatedAt: 0,
+  };
+}
+let state = loadState();
+rebuildCategoriesFromState();
+let fbApp = null, fbDb = null, fbUnsub = null, fbReady = false;
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    const def = defaultState();
+    // migração: versões antigas guardavam um único cartão em settings.cartao —
+    // se existir e ainda não houver state.cartoes salvo, converte para a lista nova
+    let cartoes = (parsed.cartoes && parsed.cartoes.length) ? parsed.cartoes : null;
+    if(!cartoes && parsed.settings?.cartao){
+      cartoes = [{ id:'cartao-1', nome:'Cartão de crédito', diaFechamento: parsed.settings.cartao.diaFechamento||22, diaVencimento: parsed.settings.cartao.diaVencimento||5 }];
+    }
+    if(!cartoes) cartoes = def.cartoes;
+    return {
+      ...def, ...parsed,
+      potes: parsed.potes || [],
+      movimentosPoupanca: parsed.movimentosPoupanca || [],
+      // dados salvos antes desta versão não têm "categorias" — usa o padrão de fábrica
+      categorias: (parsed.categorias && parsed.categorias.length) ? parsed.categorias : def.categorias,
+      cartoes,
+      settings: { ...def.settings, ...(parsed.settings||{}),
+        contaCorrente: { ...def.settings.contaCorrente, ...(parsed.settings?.contaCorrente||{}) },
+      },
+    };
+  }catch(e){ console.error(e); return defaultState(); }
+}
+function saveState(opts={}){
+  state.updatedAt = Date.now();
+  rebuildCategoriesFromState();
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+  if(!opts.skipSync) syncPushDebounced();
+  renderAll();
+}
+let pushTimer = null;
+function syncPushDebounced(){
+  if(!fbReady) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(()=>{ syncPush().catch(e=>console.error('sync push', e)); }, 900);
+}
+
+/* =========================================================
+   UTILS
+========================================================= */
+function uid(){ return 'id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9); }
+function fmtMoney(v){
+  const n = Number(v)||0;
+  return n.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+}
+function fmtMoneyCompact(v){
+  const n = Number(v)||0;
+  return (n<0?'-':'')+ 'R$ ' + Math.abs(n).toLocaleString('pt-BR',{minimumFractionDigits:0, maximumFractionDigits:0});
+}
+function fmtDate(d){
+  const dt = (d instanceof Date) ? d : new Date(d+'T12:00:00');
+  return dt.toLocaleDateString('pt-BR');
+}
+function todayISO(){ return isoFromDate(new Date()); }
+function isoFromDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function ymKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function ymFromISO(iso){ return iso.slice(0,7); }
+function ymLabel(ym){
+  const [y,m] = ym.split('-').map(Number);
+  const s = new Date(y, m-1, 1).toLocaleDateString('pt-BR',{month:'long', year:'numeric'});
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+function ymAdd(ym, delta){
+  let [y,m] = ym.split('-').map(Number);
+  m += delta;
+  while(m>12){ m-=12; y++; }
+  while(m<1){ m+=12; y--; }
+  return y+'-'+String(m).padStart(2,'0');
+}
+function daysInMonth(ym){ const [y,m]=ym.split('-').map(Number); return new Date(y,m,0).getDate(); }
+function colorVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function catColor(key){ const c = CAT_MAP[key]; return c ? colorVar(c.color) : colorVar('--series-other'); }
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+/* =========================================================
+   CÁLCULOS DE ORÇAMENTO
+========================================================= */
+function rendaFixaTotalMes(){
+  return state.settings.rendaFixa.reduce((s,r)=>s+Number(r.valor||0),0);
+}
+function rendaFixaRecebidaAteHoje(ym){
+  const hoje = new Date();
+  const curYm = ymKey(hoje);
+  if(ym < curYm) return rendaFixaTotalMes();
+  if(ym > curYm) return 0;
+  const diaHoje = hoje.getDate();
+  return state.settings.rendaFixa.filter(r=>Number(r.dia)<=diaHoje).reduce((s,r)=>s+Number(r.valor||0),0);
+}
+function lancamentosDoMes(ym){ return state.lancamentos.filter(l=>l.mesRef===ym); }
+function receitaVariavelMes(ym){ return lancamentosDoMes(ym).filter(l=>l.tipo==='receita').reduce((s,l)=>s+Number(l.valor||0),0); }
+function receitaVariavelRecebidaAteHoje(ym){
+  const hojeIso = todayISO();
+  return lancamentosDoMes(ym).filter(l=>l.tipo==='receita' && l.data<=hojeIso).reduce((s,l)=>s+Number(l.valor||0),0);
+}
+function gastosMes(ym){ return lancamentosDoMes(ym).filter(l=>l.tipo==='despesa').reduce((s,l)=>s+Number(l.valor||0),0); }
+function gastosAteHoje(ym){
+  const hojeIso = todayISO();
+  return lancamentosDoMes(ym).filter(l=>l.tipo==='despesa' && l.data<=hojeIso).reduce((s,l)=>s+Number(l.valor||0),0);
+}
+function rendaPrevistaTotalMes(ym){ return rendaFixaTotalMes() + receitaVariavelMes(ym); }
+function saldoDisponivelMes(ym){ return rendaPrevistaTotalMes(ym) - gastosMes(ym); }
+function saldoCaixaHoje(ym){
+  const hoje = new Date(), curYm = ymKey(hoje);
+  const recebido = ym===curYm ? (rendaFixaRecebidaAteHoje(ym)+receitaVariavelRecebidaAteHoje(ym)) : (ym<curYm? rendaPrevistaTotalMes(ym): 0);
+  const gasto = ym===curYm ? gastosAteHoje(ym) : (ym<curYm? gastosMes(ym): 0);
+  return recebido - gasto;
+}
+function gastoPorCategoria(ym){
+  const out = {};
+  CATEGORIES.forEach(c=>out[c.key]=0);
+  lancamentosDoMes(ym).filter(l=>l.tipo==='despesa').forEach(l=>{ out[l.categoria] = (out[l.categoria]||0) + Number(l.valor||0); });
+  return out;
+}
+function orcadoTotalMes(){ return Object.values(state.settings.orcamento).reduce((s,v)=>s+Number(v||0),0); }
+function diasRestantesMes(ym){
+  const hoje = new Date(), curYm = ymKey(hoje);
+  if(ym < curYm) return 0;
+  if(ym > curYm) return daysInMonth(ym);
+  return daysInMonth(ym) - hoje.getDate() + 1;
+}
+function diasPassadosMes(ym){
+  const hoje = new Date(), curYm = ymKey(hoje);
+  if(ym < curYm) return daysInMonth(ym);
+  if(ym > curYm) return 0;
+  return hoje.getDate();
+}
+/* projeta gasto total do mês no ritmo atual */
+function projecaoFimMes(ym, gastoAtual){
+  const passados = Math.max(1, diasPassadosMes(ym));
+  const total = daysInMonth(ym);
+  if(diasPassadosMes(ym)===0) return gastoAtual;
+  return (gastoAtual/passados) * total;
+}
+function fimDoMesISO(ym){ return ym+'-'+String(daysInMonth(ym)).padStart(2,'0'); }
+function inicioDoMesISO(ym){ return ym+'-01'; }
+
+/* =========================================================
+   FORMA DE PAGAMENTO → QUANDO SENSIBILIZA A CONTA CORRENTE
+========================================================= */
+function cartaoPadrao(){ return (state.cartoes && state.cartoes[0]) || { id:'cartao-1', nome:'Cartão de crédito', diaFechamento:22, diaVencimento:5 }; }
+function getCartao(cartaoId){ return (state.cartoes||[]).find(c=>c.id===cartaoId) || cartaoPadrao(); }
+function calcularVencimentoFatura(dataCompraISO, parcelaIndex, cartaoId){
+  const cfg = getCartao(cartaoId);
+  const diaCompra = Number(dataCompraISO.slice(8,10));
+  let baseYm = ymFromISO(dataCompraISO);
+  if(diaCompra > Number(cfg.diaFechamento)) baseYm = ymAdd(baseYm, 1);
+  const invoiceYm = ymAdd(baseYm, parcelaIndex||0);
+  const vencYm = Number(cfg.diaVencimento) < Number(cfg.diaFechamento) ? ymAdd(invoiceYm,1) : invoiceYm;
+  const diaVenc = Math.min(Number(cfg.diaVencimento)||5, daysInMonth(vencYm));
+  return vencYm+'-'+String(diaVenc).padStart(2,'0');
+}
+function calcularDataCaixa(formaTipo, dataCompraISO, parcelaIndex, vencimentoBoletoISO, cartaoId){
+  const tipo = PAYMENT_TYPE_MAP[formaTipo] || PAYMENT_TYPE_MAP.cartao;
+  if(tipo.timing==='imediato') return dataCompraISO;
+  if(tipo.timing==='vencimento') return vencimentoBoletoISO || dataCompraISO;
+  return calcularVencimentoFatura(dataCompraISO, parcelaIndex||0, cartaoId);
+}
+
+/* =========================================================
+   SALDO EM CONTA CORRENTE (caixa real, separado do orçamentário)
+========================================================= */
+function somaRendaFixaEntrePeriodo(deISO, ateISO){
+  if(ateISO < deISO) return 0;
+  let total = 0, cursorYm = ymFromISO(deISO), guard = 0;
+  const ateYm = ymFromISO(ateISO);
+  while(cursorYm <= ateYm && guard < 600){
+    (state.settings.rendaFixa||[]).forEach(r=>{
+      const dia = Math.min(Number(r.dia)||1, daysInMonth(cursorYm));
+      const iso = cursorYm+'-'+String(dia).padStart(2,'0');
+      if(iso >= deISO && iso <= ateISO) total += Number(r.valor||0);
+    });
+    cursorYm = ymAdd(cursorYm, 1);
+    guard++;
+  }
+  return total;
+}
+/* extras: lançamentos hipotéticos (simulação) ainda não salvos, mesmo formato de lancamentos */
+function saldoContaCorrente(dataLimiteISO, extras){
+  extras = extras || [];
+  const cfg = state.settings.contaCorrente || { saldoInicial:0, dataReferencia: todayISO() };
+  const deISO = cfg.dataReferencia;
+  let saldo = Number(cfg.saldoInicial||0);
+  saldo += somaRendaFixaEntrePeriodo(deISO, dataLimiteISO);
+  state.lancamentos.forEach(l=>{
+    if(l.tipo==='receita' && l.data >= deISO && l.data <= dataLimiteISO) saldo += Number(l.valor||0);
+  });
+  const todasDespesas = state.lancamentos.filter(l=>l.tipo==='despesa').concat(extras);
+  todasDespesas.forEach(l=>{
+    const dc = l.dataCaixa || l.data;
+    if(dc >= deISO && dc <= dataLimiteISO) saldo -= Number(l.valor||0);
+  });
+  (state.movimentosPoupanca||[]).forEach(m=>{
+    if(m.data >= deISO && m.data <= dataLimiteISO){
+      if(m.tipo==='aporte') saldo -= Number(m.valor||0);
+      if(m.tipo==='resgate') saldo += Number(m.valor||0);
+    }
+  });
+  return saldo;
+}
+function saldoContaCorrenteHoje(){ return saldoContaCorrente(todayISO()); }
+/* Decompõe o saldo de conta corrente até hoje em partes legíveis, para a visão "Hoje"
+   do dashboard: foto real do que já entrou/saiu da conta, sem projeção nenhuma. */
+function resumoCaixaHoje(){
+  const cfg = state.settings.contaCorrente || { saldoInicial:0, dataReferencia: todayISO(), configurado:false };
+  const deISO = cfg.dataReferencia;
+  const hojeISO = todayISO();
+  const receitasFixasRecebidas = somaRendaFixaEntrePeriodo(deISO, hojeISO);
+  let receitasVariaveisRecebidas = 0;
+  state.lancamentos.forEach(l=>{
+    if(l.tipo==='receita' && l.data>=deISO && l.data<=hojeISO) receitasVariaveisRecebidas += Number(l.valor||0);
+  });
+  let despesasDebitadas = 0;
+  state.lancamentos.filter(l=>l.tipo==='despesa').forEach(l=>{
+    const dc = l.dataCaixa || l.data;
+    if(dc>=deISO && dc<=hojeISO) despesasDebitadas += Number(l.valor||0);
+  });
+  let poupancaLiquida = 0;
+  (state.movimentosPoupanca||[]).forEach(m=>{
+    if(m.data>=deISO && m.data<=hojeISO){
+      if(m.tipo==='aporte') poupancaLiquida -= Number(m.valor||0);
+      if(m.tipo==='resgate') poupancaLiquida += Number(m.valor||0);
+    }
+  });
+  const saldoInicial = Number(cfg.saldoInicial||0);
+  const saldoHoje = saldoInicial + receitasFixasRecebidas + receitasVariaveisRecebidas - despesasDebitadas + poupancaLiquida;
+  // últimos lançamentos que já bateram na conta (dataCaixa/data <= hoje), mais recentes primeiro
+  const movimentosRecentes = state.lancamentos
+    .filter(l=> (l.tipo==='receita' ? l.data : (l.dataCaixa||l.data)) >= deISO && (l.tipo==='receita' ? l.data : (l.dataCaixa||l.data)) <= hojeISO)
+    .sort((a,b)=> (b.dataCaixa||b.data).localeCompare(a.dataCaixa||a.data))
+    .slice(0,8);
+  return { deISO, hojeISO, saldoInicial, receitasFixasRecebidas, receitasVariaveisRecebidas, despesasDebitadas, poupancaLiquida, saldoHoje, movimentosRecentes, configurado: !!cfg.configurado };
+}
+
+/* =========================================================
+   POUPANÇA (potes com rentabilidade automática)
+========================================================= */
+function diffDias(deISO, ateISO){
+  const d1 = new Date(deISO+'T12:00:00'), d2 = new Date(ateISO+'T12:00:00');
+  return Math.max(0, Math.round((d2-d1)/86400000));
+}
+function crescerComJuros(saldo, taxaMensalPct, dias){
+  if(dias<=0 || !taxaMensalPct) return saldo;
+  const taxaDiaria = Math.pow(1 + (Number(taxaMensalPct)/100), 1/30) - 1;
+  return saldo * Math.pow(1+taxaDiaria, dias);
+}
+function movimentosDoPote(poteId){ return (state.movimentosPoupanca||[]).filter(m=>m.poteId===poteId); }
+function calcularSaldoPote(pote, dataLimiteISO){
+  dataLimiteISO = dataLimiteISO || todayISO();
+  const eventos = [{ data: pote.dataBase || todayISO(), delta: Number(pote.saldoBase||0) }];
+  movimentosDoPote(pote.id).filter(m=>m.data<=dataLimiteISO).forEach(m=>{
+    eventos.push({ data: m.data, delta: m.tipo==='aporte' ? Number(m.valor||0) : -Number(m.valor||0) });
+  });
+  eventos.sort((a,b)=>a.data.localeCompare(b.data));
+  let saldo = 0, dataAnterior = eventos[0].data;
+  eventos.forEach(ev=>{
+    saldo = crescerComJuros(saldo, pote.taxaMensalPct, diffDias(dataAnterior, ev.data));
+    saldo += ev.delta;
+    dataAnterior = ev.data;
+  });
+  saldo = crescerComJuros(saldo, pote.taxaMensalPct, diffDias(dataAnterior, dataLimiteISO));
+  return saldo;
+}
+function totalAportadoPote(pote){
+  let total = Number(pote.saldoBase||0);
+  movimentosDoPote(pote.id).forEach(m=>{ total += m.tipo==='aporte' ? Number(m.valor||0) : -Number(m.valor||0); });
+  return total;
+}
+function totalPoupadoGeral(){ return (state.potes||[]).reduce((s,p)=>s+calcularSaldoPote(p), 0); }
+
+/* =========================================================
+   PARSING DE VOZ / TEXTO LIVRE
+========================================================= */
+function inferCategoria(texto){
+  const t = texto.toLowerCase();
+  for(const [cat, aliases] of Object.entries(CATEGORY_ALIASES)){
+    if(aliases.some(a=>t.includes(a))) return cat;
+  }
+  return 'outros';
+}
+function inferForma(texto){
+  const t = texto.toLowerCase();
+  for(const [forma, aliases] of Object.entries(PAYMENT_ALIASES)){
+    if(aliases.some(a=>t.includes(a))) return forma;
+  }
+  return 'cartao';
+}
+function inferQuem(texto){
+  const t = texto.toLowerCase();
+  if(/\bluciana\b|minha esposa|esposa/.test(t)) return 'luciana';
+  if(/\bpedro\b/.test(t) && /\btiago\b/.test(t)===false){} // no-op, categoria já cobre
+  if(/\beu\b|\bmeu\b|minha\b|\btiago\b/.test(t)) return 'tiago';
+  return 'tiago';
+}
+function inferValor(texto){
+  const m = texto.match(/(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)\s*(?:reais|r\$)?/i);
+  if(!m) return null;
+  let raw = m[1];
+  if(raw.includes(',')) raw = raw.replace(/\./g,'').replace(',', '.');
+  const v = parseFloat(raw);
+  return isNaN(v) ? null : v;
+}
+function parseFalaLivre(texto){
+  return {
+    valor: inferValor(texto),
+    categoria: inferCategoria(texto),
+    forma: inferForma(texto),
+    quem: inferQuem(texto),
+    descricao: texto.charAt(0).toUpperCase()+texto.slice(1),
+  };
+}
+
+/* =========================================================
+   PARSER DE FATURA (texto colado)
+========================================================= */
+function parseFaturaTexto(texto){
+  const linhas = texto.split(/\n/);
+  const blacklist = /total|saldo anterior|pagamento efetuado|limite|encargos|iof|anuidade|saldo fatura|pagto|melhor dia/i;
+  const itens = [];
+  const re = /^\s*(\d{2}\/\d{2}(?:\/\d{2,4})?)\s+(.+?)\s+(-?\s?R?\$?\s?\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)\s*$/;
+  linhas.forEach(linha=>{
+    const l = linha.trim();
+    if(!l || blacklist.test(l)) return;
+    const m = l.match(re);
+    if(!m) return;
+    let [, data, desc, valorRaw] = m;
+    valorRaw = valorRaw.replace(/\s|R\$/gi,'');
+    const neg = valorRaw.startsWith('-');
+    valorRaw = valorRaw.replace('-','');
+    let valor;
+    if(valorRaw.includes(',') && valorRaw.includes('.')){
+      valor = parseFloat(valorRaw.replace(/\./g,'').replace(',','.'));
+    } else if(valorRaw.includes(',')){
+      valor = parseFloat(valorRaw.replace(',','.'));
+    } else {
+      valor = parseFloat(valorRaw);
+    }
+    if(isNaN(valor) || valor<=0 || neg) return;
+    let [dd,mm,yy] = data.split('/');
+    let ano = yy ? (yy.length===2? '20'+yy : yy) : String(new Date().getFullYear());
+    const iso = `${ano}-${mm}-${dd}`;
+    itens.push({ data: iso, descricao: desc.trim(), valor, categoria: inferCategoria(desc), forma:'Cartão de crédito' });
+  });
+  return itens;
+}
+function jaLancado(item){
+  return state.lancamentos.some(l=> l.tipo==='despesa' && Math.abs(Number(l.valor)-item.valor)<0.02 &&
+    Math.abs((new Date(l.data)) - (new Date(item.data)))/86400000 <= 3);
+}
+
+/* =========================================================
+   UI STATE (transiente)
+========================================================= */
+const ui = {
+  view: 'dashboard',
+  dashModo: 'mes', // 'hoje' | 'mes'
+  dashYm: ymKey(new Date()),
+  relYm: ymKey(new Date()),
+  relModo: 'mes', // 'hoje' | 'mes'
+  relPessoa: 'todos',
+  relCategoria: 'todos',
+  relView: 'sintetico', // sintetico | detalhado
+  quickTipo: 'despesa',
+  quickCategoria: null,
+  quickQuem: 'tiago',
+  quickFormaTipo: 'cartao',
+  quickAnexo: null,
+  quickBoletoVenc: '',
+  quickCartaoId: null,
+  simCategoria: null,
+  simQuem: 'tiago',
+  simFormaTipo: 'cartao',
+  simBoletoVenc: '',
+  simCartaoId: null,
+  faturaItens: [],
+  poupSheetPote: null,
+};
+
+/* =========================================================
+   NAVEGAÇÃO / SHEET / TOAST
+========================================================= */
+function showView(name){
+  ui.view = name;
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
+  renderAll();
+  window.scrollTo(0,0);
+}
+function openSheet(html){
+  document.getElementById('sheetContent').innerHTML = html;
+  document.getElementById('sheetBackdrop').classList.add('open');
+}
+function closeSheet(){
+  document.getElementById('sheetBackdrop').classList.remove('open');
+  document.getElementById('sheetContent').innerHTML = '';
+}
+/* Seleção de chip sem re-renderizar o formulário inteiro (preserva o que já foi digitado) */
+function chipSelect(el, uiField, value){
+  ui[uiField] = value;
+  el.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function capturarCamposLancar(){
+  const g = id=>document.getElementById(id);
+  if(g('quickAmount')) ui.quickAmountStr = g('quickAmount').value;
+  if(g('quickDesc')) ui.quickDescStr = g('quickDesc').value;
+  if(g('quickData')) ui.quickDataStr = g('quickData').value;
+  if(g('quickMesRef')) ui.quickMesRefStr = g('quickMesRef').value;
+  if(g('quickBoletoVenc')) ui.quickBoletoVenc = g('quickBoletoVenc').value;
+}
+function trocarTipoLancamento(tipo){ capturarCamposLancar(); ui.quickTipo = tipo; renderLancar(); }
+function selecionarFormaPagamento(tipo){
+  capturarCamposLancar();
+  ui.quickFormaTipo = tipo;
+  if(tipo!=='cartao') ui.quickParceladoOn = false;
+  renderLancar();
+}
+function toggleParcelado(){ capturarCamposLancar(); ui.quickParceladoOn = document.getElementById('quickParcelado').checked; renderLancar(); }
+function toggleSimParcelado(){ capturarCamposSimuladorFull(); ui.simParceladoOn = document.getElementById('simParcelado').checked; renderSimulador(); }
+
+/* =========================================================
+   RENDER MASTER
+========================================================= */
+function renderAll(){
+  document.getElementById('headerSubtitle').textContent = ymLabel(ui.dashYm);
+  renderSyncBadge();
+  if(ui.view==='dashboard') renderDashboard();
+  if(ui.view==='lancar') renderLancar();
+  if(ui.view==='simulador') renderSimulador();
+  if(ui.view==='relatorios') renderRelatorios();
+  if(ui.view==='poupanca') renderPoupanca();
+  if(ui.view==='config') renderConfig();
+}
+function renderSyncBadge(){
+  const on = !!(state.settings.firebase && fbReady);
+  document.getElementById('syncDot').classList.toggle('on', on);
+  document.getElementById('syncLabel').textContent = on ? 'Sincronizado' : 'Só neste aparelho';
+}
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
+function renderDashboard(){
+  ui.dashModo = ui.dashModo || 'mes'; // 'hoje' | 'mes'
+  if(ui.dashModo==='hoje'){ renderDashboardHoje(); return; }
+  renderDashboardMes();
+}
+function trocarDashModo(modo){ ui.dashModo = modo; renderAll(); }
+function renderDashboardHoje(){
+  const r = resumoCaixaHoje();
+  const html = `
+    <div class="segmented"><button class="${ui.dashModo==='hoje'?'active':''}" onclick="trocarDashModo('hoje')">📍 Hoje</button><button class="${ui.dashModo==='mes'?'active':''}" onclick="trocarDashModo('mes')">📅 Mês</button></div>
+
+    <div class="card hero-balance">
+      <div class="label">Saldo em conta hoje <span class="hint" title="Foto real do dinheiro: saldo inicial informado + tudo que já entrou − tudo que já saiu da conta até agora. Não inclui nada que ainda vai vencer.">ⓘ</span></div>
+      <div class="value ${r.saldoHoje<0?'neg':'pos'}">${fmtMoney(r.saldoHoje)}</div>
+      <div class="sub">Atualizado até ${fmtDate(r.hojeISO)}</div>
+    </div>
+
+    ${!r.configurado ? `<div class="card"><div class="insight warn"><span class="icon">🏦</span><span>Você ainda não configurou o saldo inicial da sua conta em <b>Ajustes</b> — esse número está partindo de R$ 0 e não reflete seu saldo real ainda.</span></div></div>` : ''}
+
+    <div class="card">
+      <h2>Como chegamos nesse número</h2>
+      <div class="cat-list">
+        <div class="cat-row"><div class="top"><div class="name">💰 Saldo inicial informado</div><div class="nums"><b>${fmtMoney(r.saldoInicial)}</b></div></div></div>
+        <div class="cat-row"><div class="top"><div class="name">📥 Renda fixa já recebida</div><div class="nums"><b style="color:var(--good-text)">+${fmtMoney(r.receitasFixasRecebidas)}</b></div></div></div>
+        ${r.receitasVariaveisRecebidas>0 ? `<div class="cat-row"><div class="top"><div class="name">📥 Receita variável já recebida</div><div class="nums"><b style="color:var(--good-text)">+${fmtMoney(r.receitasVariaveisRecebidas)}</b></div></div></div>` : ''}
+        <div class="cat-row"><div class="top"><div class="name">📤 Despesas já debitadas</div><div class="nums"><b style="color:var(--critical)">−${fmtMoney(r.despesasDebitadas)}</b></div></div></div>
+        ${r.poupancaLiquida!==0 ? `<div class="cat-row"><div class="top"><div class="name">🐷 Movimentos de poupança</div><div class="nums"><b style="color:${r.poupancaLiquida<0?'var(--critical)':'var(--good-text)'}">${r.poupancaLiquida<0?'−':'+'}${fmtMoney(Math.abs(r.poupancaLiquida))}</b></div></div></div>` : ''}
+      </div>
+      <div class="hint" style="margin-top:10px;">Desde ${fmtDate(r.deISO)} (data de referência configurada em Ajustes). Isso é diferente da visão <b>Mês</b>, que já inclui gastos parcelados/boletos que ainda vão vencer.</div>
+    </div>
+
+    <div class="card">
+      <h2>Últimos lançamentos que já bateram na conta</h2>
+      ${r.movimentosRecentes.length===0 ? `<div class="empty-state"><div class="ic">📭</div>Nada bateu na conta ainda no período configurado.</div>` :
+      r.movimentosRecentes.map(l=>renderTxnItem(l)).join('')}
+    </div>
+  `;
+  document.getElementById('view-dashboard').innerHTML = html;
+}
+function renderDashboardMes(){
+  const ym = ui.dashYm;
+  const saldo = saldoDisponivelMes(ym);
+  const caixaHoje = saldoContaCorrenteHoje();
+  const gastos = gastosMes(ym);
+  const rendaPrev = rendaPrevistaTotalMes(ym);
+  const orcTotal = orcadoTotalMes();
+  const catGasto = gastoPorCategoria(ym);
+  const isCurMonth = ym===ymKey(new Date());
+  const hojeYm = ymKey(new Date());
+  const proximosMeses = [0,1,2,3].map(i=>{
+    const m = ymAdd(hojeYm, i);
+    return { ym:m, label: i===0?'Fim deste mês':ymLabel(m), saldo: saldoContaCorrente(fimDoMesISO(m)) };
+  });
+
+  const porCategoriaRows = CATEGORIES.filter(c=>c.key!=='variavel').map(c=>{
+    const orc = Number(state.settings.orcamento[c.key]||0);
+    const real = catGasto[c.key]||0;
+    const pct = orc>0 ? Math.min(100,(real/orc)*100) : (real>0?100:0);
+    const over = orc>0 && real>orc;
+    return { ...c, orc, real, pct, over };
+  }).filter(r=>r.orc>0 || r.real>0)
+    .sort((a,b)=> (b.real/(b.orc||1)) - (a.real/(a.orc||1)));
+
+  let insights = [];
+  if(!state.settings.contaCorrente.configurado){
+    insights.push({ type:'warn', icon:'🏦', html:`Ainda não sei o saldo real da sua conta corrente — os valores de "conta corrente" abaixo partem de R$ 0. Configure o saldo atual em <b>Ajustes</b> para ficar preciso.` });
+  }
+  if(isCurMonth && caixaHoje < 0){
+    insights.push({ type:'crit', icon:'⚠️', html:`Sua conta corrente projetada para hoje está negativa (<b>${fmtMoney(caixaHoje)}</b>) considerando tudo que já venceu. É provável que você precise tocar a reserva se nada mudar.` });
+  }
+  const proxMes = proximosMeses[1];
+  if(proxMes && proxMes.saldo < caixaHoje - 0.5){
+    insights.push({ type:'warn', icon:'📅', html:`Sua conta corrente projetada para o fim de <b>${ymLabel(proxMes.ym)}</b> é de <b>${fmtMoney(proxMes.saldo)}</b> — já considerando parcelas e boletos que ainda vão vencer.` });
+  }
+  porCategoriaRows.filter(r=>r.over).forEach(r=>{
+    insights.push({ type:'crit', icon:r.icon, html:`<b>${r.label}</b> já estourou o orçado em ${fmtMoney(r.real-r.orc)} (${Math.round((r.real/r.orc-1)*100)}% acima).` });
+  });
+  if(isCurMonth && diasPassadosMes(ym)>=5){
+    const proj = projecaoFimMes(ym, gastos);
+    if(orcTotal>0 && proj > orcTotal*1.05){
+      insights.push({ type:'warn', icon:'📈', html:`No ritmo atual de gastos, você deve fechar o mês em torno de <b>${fmtMoney(proj)}</b> — ${fmtMoney(proj-orcTotal)} acima do orçado (${fmtMoney(orcTotal)}).` });
+    }
+  }
+  if(insights.length===0){
+    insights.push({ type:'good', icon:'✅', html: orcTotal>0 ? 'Nenhum alerta por enquanto — os gastos estão dentro do planejado.' : 'Configure seu orçamento por categoria em <b>Ajustes</b> para receber alertas automáticos.' });
+  }
+
+  const html = `
+    <div class="segmented"><button class="${ui.dashModo==='hoje'?'active':''}" onclick="trocarDashModo('hoje')">📍 Hoje</button><button class="${ui.dashModo==='mes'?'active':''}" onclick="trocarDashModo('mes')">📅 Mês</button></div>
+
+    <div class="card hero-balance">
+      <div class="period-nav">
+        <button onclick="ui.dashYm=ymAdd(ui.dashYm,-1);renderAll()">‹</button>
+        <div class="period-label">${ymLabel(ym)}</div>
+        <button onclick="ui.dashYm=ymAdd(ui.dashYm,1);renderAll()">›</button>
+      </div>
+      <div class="label" style="margin-top:14px;">Saldo orçamentário do mês</div>
+      <div class="value ${saldo<0?'neg':'pos'}">${fmtMoney(saldo)}</div>
+      <div class="sub">Renda prevista ${fmtMoney(rendaPrev)} − já lançado ${fmtMoney(gastos)} <span class="hint" title="Considera tudo já lançado neste mês de orçamento, mesmo que o dinheiro ainda não tenha saído da conta">ⓘ</span></div>
+      <div class="stat-grid">
+        <div class="stat-tile">
+          <div class="stat-label">Conta corrente hoje</div>
+          <div class="stat-value ${caixaHoje<0?'crit':'good'}">${fmtMoneyCompact(caixaHoje)}</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">${isCurMonth? 'Dias restantes':'Período'}</div>
+          <div class="stat-value">${isCurMonth? diasRestantesMes(ym)+'d' : (ym<ymKey(new Date())?'Encerrado':'Futuro')}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Consultor financeiro</h2>
+      ${insights.map(i=>`<div class="insight ${i.type}"><span class="icon">${i.icon}</span><span>${i.html}</span></div>`).join('')}
+    </div>
+
+    <div class="card">
+      <h2>Projeção da conta corrente <span class="hint">· considera parcelas e boletos já lançados</span></h2>
+      <div class="cat-list">
+        ${proximosMeses.map((m,idx)=>`
+        <div class="cat-row">
+          <div class="top">
+            <div class="name">${idx===0?'📍 Hoje até fim do mês':'📅 '+m.label}</div>
+            <div class="nums"><b class="${m.saldo<0?'':''}" style="color:${m.saldo<0?colorVar('--critical'):'var(--text-primary)'}">${fmtMoney(m.saldo)}</b></div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Orçado × Realizado por categoria <span class="hint">· ${ymLabel(ym)}</span></h2>
+      ${porCategoriaRows.length===0 ? `<div class="empty-state"><div class="ic">🗂️</div>Nenhum orçamento configurado ainda.<br><button class="link-btn" onclick="showView('config')">Configurar categorias →</button></div>` :
+      `<div class="cat-list">${porCategoriaRows.map(r=>`
+        <div class="cat-row">
+          <div class="top">
+            <div class="name"><span class="cat-swatch" style="background:${colorVar(r.color)}"></span>${r.icon} ${r.label}</div>
+            <div class="nums"><b>${fmtMoneyCompact(r.real)}</b> ${r.orc>0? '/ '+fmtMoneyCompact(r.orc):''}</div>
+          </div>
+          <div class="track"><div class="fill" style="width:${r.pct}%; background:${r.over? colorVar('--critical') : colorVar(r.color)}"></div></div>
+          ${r.over? `<div class="over-note">Estourou em ${fmtMoney(r.real-r.orc)}</div>`:''}
+        </div>`).join('')}</div>`}
+    </div>
+  `;
+  document.getElementById('view-dashboard').innerHTML = html;
+}
+
+/* =========================================================
+   LANÇAR
+========================================================= */
+function openQuickAdd(){ showView('lancar'); setTimeout(()=>document.getElementById('quickAmount')?.focus(), 150); }
+
+function renderLancar(){
+  const cats = CATEGORIES.filter(c=>c.key!=='variavel');
+  const html = `
+    <div class="card">
+      <h2>Novo lançamento</h2>
+      <div class="segmented">
+        <button class="${ui.quickTipo==='despesa'?'active':''}" onclick="trocarTipoLancamento('despesa')">Despesa</button>
+        <button class="${ui.quickTipo==='receita'?'active':''}" onclick="trocarTipoLancamento('receita')">Receita variável</button>
+      </div>
+
+      <button class="mic-btn" id="micBtn" onclick="toggleVoice()">
+        <span class="mic-pulse"></span> 🎙️ <span id="micBtnLabel">Falar lançamento</span>
+      </button>
+      <div class="voice-transcript" id="voiceTranscript"></div>
+
+      <div class="field">
+        <label>Valor</label>
+        <div class="amount-wrap">
+          <span class="prefix">R$</span>
+          <input class="amount-input" type="text" inputmode="decimal" id="quickAmount" placeholder="0,00" value="${ui.quickAmountStr||''}">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Descrição</label>
+        <input type="text" id="quickDesc" placeholder="${ui.quickTipo==='despesa'?'Ex: Mercado do mês':'Ex: 13º salário, venda do sofá'}" value="${ui.quickDescStr||''}">
+      </div>
+
+      ${ui.quickTipo==='despesa' ? `
+      <div class="field">
+        <label>Categoria</label>
+        <div class="chip-group" id="quickCatChips">
+          ${cats.map(c=>`<button type="button" class="chip ${ui.quickCategoria===c.key?'selected':''}" onclick="chipSelect(this,'quickCategoria','${c.key}')">${c.icon} ${c.label}</button>`).join('')}
+        </div>
+      </div>
+      <div class="field">
+        <label>Quem gastou</label>
+        <div class="chip-group">
+          ${PEOPLE.map(p=>`<button type="button" class="chip ${ui.quickQuem===p.key?'selected':''}" onclick="chipSelect(this,'quickQuem','${p.key}')">${p.icon} ${p.label}</button>`).join('')}
+        </div>
+      </div>
+      <div class="field">
+        <label>Forma de pagamento</label>
+        <div class="chip-group">
+          ${PAYMENT_TYPES.map(p=>`<button type="button" class="chip ${ui.quickFormaTipo===p.key?'selected':''}" onclick="selecionarFormaPagamento('${p.key}')">${p.icon} ${p.label}</button>`).join('')}
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Data da compra</label>
+          <input type="date" id="quickData" value="${ui.quickDataStr||todayISO()}">
+        </div>
+        <div class="field">
+          <label>Mês do orçamento <span class="hint" title="Use para faturas fechadas em outro mês">ⓘ</span></label>
+          <input type="date" id="quickMesRef" value="${ui.quickMesRefStr||todayISO()}">
+        </div>
+      </div>
+      ${ui.quickFormaTipo==='boleto' ? `
+      <div class="field">
+        <label>Data de vencimento do boleto</label>
+        <input type="date" id="quickBoletoVenc" value="${ui.quickBoletoVenc||todayISO()}">
+        <div class="hint">O valor só sai da sua conta corrente nessa data — mas já entra no orçamento do mês agora.</div>
+      </div>
+      ` : ''}
+      ${ui.quickFormaTipo==='cartao' ? `
+      ${state.cartoes.length>1 ? `
+      <div class="field">
+        <label>Qual cartão</label>
+        <div class="chip-group">${state.cartoes.map(c=>`<button type="button" class="chip ${(ui.quickCartaoId||cartaoPadrao().id)===c.id?'selected':''}" onclick="chipSelect(this,'quickCartaoId','${c.id}')">💳 ${c.nome}</button>`).join('')}</div>
+      </div>
+      ` : ''}
+      <div class="field">
+        <label><input type="checkbox" id="quickParcelado" onchange="toggleParcelado()" ${ui.quickParceladoOn?'checked':''}> Compra parcelada</label>
+      </div>
+      ${ui.quickParceladoOn ? `
+      <div class="row2">
+        <div class="field"><label>Nº de parcelas</label><input type="number" id="quickParcelasN" min="2" max="48" value="${ui.quickParcelasN||2}"></div>
+        <div class="field"><label>Valor por parcela</label><input type="text" id="quickParcelaValor" inputmode="decimal" placeholder="0,00"></div>
+      </div>
+      ` : ''}
+      <div class="field hint" style="margin-top:-8px;">${ui.quickParceladoOn ? 'Cada parcela cai na fatura do mês correspondente, conforme o ciclo configurado em Ajustes.' : 'Vai cair na próxima fatura que fechar, conforme o ciclo configurado em Ajustes.'}</div>
+      ` : ''}
+      <div class="field">
+        <label>Comprovante (opcional)</label>
+        <input type="file" id="quickAnexo" accept="image/*,application/pdf" onchange="handleAnexoSelecionado(event)">
+        <div class="hint" id="anexoStatus">JPG, PNG ou PDF até 1,5 MB.</div>
+      </div>
+      ` : `
+      <div class="field">
+        <label>Mês de referência dessa receita</label>
+        <input type="date" id="quickMesRef" value="${ui.quickMesRefStr||todayISO()}">
+        <div class="hint">Ex: recebeu o 13º agora mas quer contabilizar no orçamento de dezembro — escolha uma data dentro daquele mês.</div>
+      </div>
+      <div class="field">
+        <label>Quem recebeu</label>
+        <div class="chip-group">
+          ${PEOPLE.map(p=>`<button type="button" class="chip ${ui.quickQuem===p.key?'selected':''}" onclick="chipSelect(this,'quickQuem','${p.key}')">${p.icon} ${p.label}</button>`).join('')}
+        </div>
+      </div>
+      `}
+
+      <button class="btn btn-primary" style="margin-top:6px;" onclick="salvarLancamentoRapido()">Salvar lançamento</button>
+    </div>
+
+    ${ui.quickTipo==='despesa' ? `
+    <div class="card">
+      <h2>Conferir fatura do cartão <span class="hint">· cole o texto ou envie o PDF/print</span></h2>
+      <div class="upload-drop" onclick="document.getElementById('faturaFile').click()">
+        <b>📎 Enviar arquivo da fatura</b>
+        Foto, print de tela ou PDF — vamos tentar ler os lançamentos automaticamente
+      </div>
+      <input type="file" id="faturaFile" accept="image/*,application/pdf" style="display:none" onchange="handleFaturaArquivo(event)">
+      <div id="faturaStatus" class="hint" style="margin-bottom:10px;"></div>
+      <div class="field">
+        <label>...ou cole o texto da fatura aqui</label>
+        <textarea id="faturaTexto" placeholder="15/07  UBER TRIP                 23,50&#10;16/07  SUPERMERCADO PAO DE ACUCAR  145,32"></textarea>
+      </div>
+      <button class="btn btn-secondary" onclick="analisarFaturaTexto()">Analisar texto</button>
+      <div id="faturaResultado"></div>
+    </div>` : ''}
+  `;
+  document.getElementById('view-lancar').innerHTML = html;
+}
+
+function handleAnexoSelecionado(ev){
+  const f = ev.target.files[0];
+  if(!f) return;
+  if(f.size > 1.5*1024*1024){
+    document.getElementById('anexoStatus').textContent = 'Arquivo muito grande (máx. 1,5 MB) — vamos guardar só o nome.';
+    ui.quickAnexo = { nome: f.name, data: null };
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = ()=>{ ui.quickAnexo = { nome: f.name, data: reader.result }; document.getElementById('anexoStatus').textContent = '✓ '+f.name+' anexado'; };
+  reader.readAsDataURL(f);
+}
+
+function salvarLancamentoRapido(){
+  const parceladoEl = document.getElementById('quickParcelado');
+  ui.quickParceladoOn = parceladoEl ? parceladoEl.checked : false;
+  const valorStr = document.getElementById('quickAmount').value;
+  const valor = parseMoneyInput(valorStr);
+  const desc = document.getElementById('quickDesc').value.trim() || (ui.quickTipo==='despesa'?'Despesa':'Receita');
+  const mesRefEl = document.getElementById('quickMesRef');
+  const mesRef = mesRefEl ? ymFromISO(mesRefEl.value||todayISO()) : ymKey(new Date());
+
+  if(ui.quickTipo==='receita'){
+    if(!valor || valor<=0){ showToast('Informe um valor válido'); return; }
+    state.lancamentos.push({
+      id: uid(), tipo:'receita', valor, descricao: desc, categoria:'variavel',
+      quem: ui.quickQuem, forma:null, data: todayISO(), mesRef, origem:'manual', criadoEm: Date.now(),
+    });
+    saveState();
+    showToast('Receita lançada ✓');
+    ui.quickCategoria=null; ui.quickAnexo=null;
+    limparCamposLancamento();
+    return;
+  }
+
+  if(!valor || valor<=0){ showToast('Informe um valor válido'); return; }
+  if(!ui.quickCategoria){ showToast('Escolha uma categoria'); return; }
+  const dataEl = document.getElementById('quickData');
+  const dataCompra = dataEl.value || todayISO();
+  const formaTipo = ui.quickFormaTipo;
+  const formaLabel = PAYMENT_TYPE_MAP[formaTipo].label;
+  const boletoVencEl = document.getElementById('quickBoletoVenc');
+  const boletoVenc = boletoVencEl ? (boletoVencEl.value || dataCompra) : null;
+  const cartaoId = formaTipo==='cartao' ? (ui.quickCartaoId || cartaoPadrao().id) : null;
+
+  if(formaTipo==='cartao' && ui.quickParceladoOn){
+    const n = parseInt(document.getElementById('quickParcelasN').value)||2;
+    const valorParcela = parseMoneyInput(document.getElementById('quickParcelaValor').value) || valor;
+    const grupoId = uid();
+    for(let i=0;i<n;i++){
+      state.lancamentos.push({
+        id: uid(), tipo:'despesa', valor: valorParcela,
+        descricao: `${desc} (parcela ${i+1}/${n})`,
+        categoria: ui.quickCategoria, quem: ui.quickQuem, forma: formaLabel, formaTipo, cartaoId,
+        data: dataCompra, dataCaixa: calcularDataCaixa(formaTipo, dataCompra, i, null, cartaoId),
+        mesRef: ymAdd(mesRef, i), origem:'manual', parcelaGrupo: grupoId,
+        parcela: { atual:i+1, total:n }, criadoEm: Date.now(),
+      });
+    }
+    saveState();
+    showToast(`${n} parcelas lançadas ✓`);
+  } else {
+    state.lancamentos.push({
+      id: uid(), tipo:'despesa', valor, descricao: desc, categoria: ui.quickCategoria,
+      quem: ui.quickQuem, forma: formaLabel, formaTipo, cartaoId, data: dataCompra,
+      dataCaixa: calcularDataCaixa(formaTipo, dataCompra, 0, boletoVenc, cartaoId), mesRef,
+      origem:'manual', anexoNome: ui.quickAnexo?.nome||null, anexoData: ui.quickAnexo?.data||null,
+      criadoEm: Date.now(),
+    });
+    saveState();
+    showToast('Gasto lançado ✓');
+  }
+  ui.quickCategoria=null; ui.quickAnexo=null; ui.quickParceladoOn=false;
+  limparCamposLancamento();
+}
+function limparCamposLancamento(){
+  ui.quickAmountStr=''; ui.quickDescStr=''; ui.quickDataStr=''; ui.quickMesRefStr=''; ui.quickBoletoVenc='';
+  renderLancar();
+}
+function parseMoneyInput(str){
+  if(!str) return null;
+  str = String(str).trim().replace(/^r\$\s*/i,'');
+  if(str.includes(',')) str = str.replace(/\./g,'').replace(',', '.');
+  const v = parseFloat(str);
+  return isNaN(v)? null : v;
+}
+
+/* ---- Voz ----
+   O reconhecimento de voz do Chrome exige "contexto seguro" (https://) para liberar
+   o microfone de verdade — abrir o app como arquivo local (file://), especialmente
+   no Android, costuma fazer o navegador negar o microfone sem avisar nada. Por isso
+   avisamos proativamente quando detectamos file://, e também tratamos todo erro
+   (síncrono ou assíncrono) com uma mensagem visível — nunca falhar em silêncio. */
+function explicacaoErroVoz(codigo){
+  const viaArquivoLocal = location.protocol === 'file:';
+  const sufixoArquivo = viaArquivoLocal ? ' Isso costuma acontecer porque o app foi aberto como arquivo local — acesse pelo link https:// do app para o microfone funcionar.' : '';
+  const mapa = {
+    'not-allowed': 'Permissão de microfone negada.' + sufixoArquivo,
+    'service-not-allowed': 'O navegador bloqueou o serviço de reconhecimento de voz.' + sufixoArquivo,
+    'audio-capture': 'Não consegui acessar o microfone do aparelho.',
+    'network': 'Sem conexão — o reconhecimento de voz do Chrome precisa de internet.',
+    'no-speech': 'Não ouvi nada. Toque no microfone e fale novamente.',
+  };
+  return mapa[codigo] || ('Não foi possível usar o microfone (' + (codigo||'erro desconhecido') + ').' + sufixoArquivo);
+}
+let recognizer = null, recognizing = false;
+function toggleVoice(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ showToast('Reconhecimento de voz não disponível neste navegador'); return; }
+  if(recognizing){ recognizer.stop(); return; }
+  if(location.protocol === 'file:'){
+    showToast('Voz precisa do link https:// do app para funcionar (não funciona abrindo o arquivo direto).');
+    return;
+  }
+  try{
+    recognizer = new SR();
+    recognizer.lang = 'pt-BR';
+    recognizer.interimResults = true;
+    recognizer.continuous = false;
+    recognizing = true;
+    document.getElementById('micBtn').classList.add('listening');
+    document.getElementById('micBtnLabel').textContent = 'Ouvindo... toque para parar';
+    recognizer.onresult = (e)=>{
+      let texto = '';
+      for(let i=0;i<e.results.length;i++) texto += e.results[i][0].transcript;
+      document.getElementById('voiceTranscript').textContent = '"'+texto+'"';
+      if(e.results[e.results.length-1].isFinal) aplicarFalaAoFormulario(texto);
+    };
+    recognizer.onerror = (e)=>{ showToast(explicacaoErroVoz(e && e.error)); pararVoz(); };
+    recognizer.onend = ()=>{ pararVoz(); };
+    recognizer.start();
+  }catch(err){
+    console.error('voz', err);
+    showToast(explicacaoErroVoz(err && err.name));
+    pararVoz();
+  }
+}
+function pararVoz(){
+  recognizing = false;
+  const btn = document.getElementById('micBtn');
+  if(btn){ btn.classList.remove('listening'); document.getElementById('micBtnLabel').textContent = 'Falar lançamento'; }
+}
+function aplicarFalaAoFormulario(texto){
+  const parsed = parseFalaLivre(texto);
+  if(parsed.valor) ui.quickAmountStr = String(parsed.valor).replace('.',',');
+  ui.quickDescStr = parsed.descricao;
+  if(ui.quickTipo==='despesa'){
+    ui.quickCategoria = parsed.categoria;
+    ui.quickFormaTipo = parsed.forma;
+  }
+  ui.quickQuem = parsed.quem;
+  renderLancar();
+  const vt = document.getElementById('voiceTranscript');
+  if(vt) vt.textContent = 'Revise os campos e toque em Salvar ✓';
+}
+
+/* ---- Fatura: colar texto ---- */
+function analisarFaturaTexto(){
+  const txt = document.getElementById('faturaTexto').value;
+  if(!txt.trim()){ showToast('Cole o texto da fatura primeiro'); return; }
+  const itens = parseFaturaTexto(txt);
+  ui.faturaItens = itens;
+  renderFaturaResultado();
+}
+function renderFaturaResultado(){
+  const box = document.getElementById('faturaResultado');
+  if(!box) return;
+  if(ui.faturaItens.length===0){ box.innerHTML = `<div class="empty-state">Não consegui reconhecer lançamentos nesse texto. Tente colar linhas no formato "data  descrição  valor".</div>`; return; }
+  box.innerHTML = `
+    <div class="hint" style="margin:10px 0;">Encontramos ${ui.faturaItens.length} lançamento(s). Os marcados com ✓ já parecem estar no seu controle — desmarque se quiser revisar mesmo assim.</div>
+    ${ui.faturaItens.map((it,idx)=>{
+      const jaTem = jaLancado(it);
+      return `
+      <div class="txn-item" style="align-items:flex-start;">
+        <input type="checkbox" id="fi_${idx}" ${jaTem?'':'checked'} style="margin-top:14px;">
+        <div class="txn-mid">
+          <div class="txn-desc">${it.descricao} ${jaTem? '<span style=\"color:var(--good-text)\">· já lançado</span>':''}</div>
+          <div class="txn-meta">${fmtDate(it.data)} · ${fmtMoney(it.valor)}</div>
+          <div class="row2" style="margin-top:6px;">
+            <select id="fi_cat_${idx}" class="field-select">
+              ${CATEGORIES.filter(c=>c.key!=='variavel').map(c=>`<option value="${c.key}" ${c.key===it.categoria?'selected':''}>${c.icon} ${c.label}</option>`).join('')}
+            </select>
+            <select id="fi_quem_${idx}" class="field-select">
+              ${PEOPLE.map(p=>`<option value="${p.key}">${p.label}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+    <button class="btn btn-primary" style="margin-top:12px;" onclick="confirmarImportacaoFatura()">Adicionar selecionados</button>
+  `;
+}
+function confirmarImportacaoFatura(){
+  let count = 0;
+  ui.faturaItens.forEach((it, idx)=>{
+    const chk = document.getElementById('fi_'+idx);
+    if(!chk || !chk.checked) return;
+    const cat = document.getElementById('fi_cat_'+idx).value;
+    const quem = document.getElementById('fi_quem_'+idx).value;
+    state.lancamentos.push({
+      id: uid(), tipo:'despesa', valor: it.valor, descricao: it.descricao, categoria: cat,
+      quem, forma:'Cartão de crédito', formaTipo:'cartao', cartaoId: cartaoPadrao().id, data: it.data,
+      dataCaixa: calcularDataCaixa('cartao', it.data, 0, null, cartaoPadrao().id), mesRef: ymFromISO(it.data),
+      origem:'fatura', criadoEm: Date.now(),
+    });
+    count++;
+  });
+  saveState();
+  ui.faturaItens = [];
+  showToast(count+' lançamento(s) adicionados ✓');
+  renderLancar();
+}
+
+/* ---- Fatura: upload de arquivo (PDF / imagem) ---- */
+function loadScriptOnce(src){
+  return new Promise((resolve,reject)=>{
+    if(document.querySelector(`script[data-src="${src}"]`)) return resolve();
+    const s = document.createElement('script');
+    s.src = src; s.dataset.src = src;
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+async function handleFaturaArquivo(ev){
+  const f = ev.target.files[0];
+  if(!f) return;
+  const statusEl = document.getElementById('faturaStatus');
+  statusEl.textContent = '⏳ Lendo arquivo, isso pode levar alguns segundos...';
+  try{
+    let texto = '';
+    if(f.type === 'application/pdf'){
+      await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js');
+      const buf = await f.arrayBuffer();
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js';
+      const pdf = await window.pdfjsLib.getDocument({data: buf}).promise;
+      for(let p=1;p<=pdf.numPages;p++){
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        const strs = content.items.map(it=>it.str);
+        texto += strs.join(' ')+'\n';
+      }
+    } else if(f.type.startsWith('image/')){
+      await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js');
+      const { data } = await window.Tesseract.recognize(f, 'por');
+      texto = data.text;
+    } else {
+      statusEl.textContent = 'Formato não suportado — envie imagem ou PDF.';
+      return;
+    }
+    document.getElementById('faturaTexto').value = texto;
+    const itens = parseFaturaTexto(texto);
+    if(itens.length===0){
+      statusEl.textContent = 'Não consegui reconhecer os lançamentos automaticamente. O texto extraído foi colado abaixo — ajuste manualmente e toque em "Analisar texto".';
+    } else {
+      statusEl.textContent = `✓ ${itens.length} lançamento(s) identificados — revise antes de confirmar.`;
+      ui.faturaItens = itens;
+      renderFaturaResultado();
+    }
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = 'Não consegui ler esse arquivo automaticamente. Tente colar o texto manualmente.';
+  }
+}
+
+/* =========================================================
+   SIMULADOR
+========================================================= */
+function capturarCamposSimuladorFull(){
+  const g = id=>document.getElementById(id);
+  if(g('simDesc')) ui.simDescStr = g('simDesc').value;
+  if(g('simValor')) ui.simValorStr = g('simValor').value;
+  if(g('simBoletoVenc')) ui.simBoletoVenc = g('simBoletoVenc').value;
+}
+function selecionarFormaSimulador(tipo){
+  capturarCamposSimuladorFull();
+  ui.simFormaTipo = tipo;
+  if(tipo!=='cartao') ui.simParceladoOn = false;
+  renderSimulador();
+}
+function renderSimulador(){
+  const cats = CATEGORIES.filter(c=>c.key!=='variavel');
+  const html = `
+    <div class="card">
+      <h2>Simular um gasto antes de decidir</h2>
+      <div class="field">
+        <label>O que você está pensando em comprar?</label>
+        <input type="text" id="simDesc" placeholder="Ex: Tênis novo" value="${ui.simDescStr||''}">
+      </div>
+      <div class="field">
+        <label>Valor</label>
+        <div class="amount-wrap"><span class="prefix">R$</span><input class="amount-input" type="text" inputmode="decimal" id="simValor" placeholder="0,00" value="${ui.simValorStr||''}"></div>
+      </div>
+      <div class="field">
+        <label>Categoria</label>
+        <div class="chip-group">
+          ${cats.map(c=>`<button type="button" class="chip ${ui.simCategoria===c.key?'selected':''}" onclick="chipSelect(this,'simCategoria','${c.key}')">${c.icon} ${c.label}</button>`).join('')}
+        </div>
+      </div>
+      <div class="field">
+        <label>Quem vai gastar</label>
+        <div class="chip-group">
+          ${PEOPLE.map(p=>`<button type="button" class="chip ${ui.simQuem===p.key?'selected':''}" onclick="chipSelect(this,'simQuem','${p.key}')">${p.icon} ${p.label}</button>`).join('')}
+        </div>
+      </div>
+      <div class="field">
+        <label>Forma de pagamento</label>
+        <div class="chip-group">
+          ${PAYMENT_TYPES.map(p=>`<button type="button" class="chip ${ui.simFormaTipo===p.key?'selected':''}" onclick="selecionarFormaSimulador('${p.key}')">${p.icon} ${p.label}</button>`).join('')}
+        </div>
+      </div>
+      ${ui.simFormaTipo==='boleto' ? `
+      <div class="field"><label>Data de vencimento</label><input type="date" id="simBoletoVenc" value="${ui.simBoletoVenc||todayISO()}"></div>
+      ` : ''}
+      ${ui.simFormaTipo==='cartao' ? `
+      ${state.cartoes.length>1 ? `
+      <div class="field">
+        <label>Qual cartão</label>
+        <div class="chip-group">${state.cartoes.map(c=>`<button type="button" class="chip ${(ui.simCartaoId||cartaoPadrao().id)===c.id?'selected':''}" onclick="chipSelect(this,'simCartaoId','${c.id}')">💳 ${c.nome}</button>`).join('')}</div>
+      </div>
+      ` : ''}
+      <div class="field">
+        <label><input type="checkbox" id="simParcelado" onchange="toggleSimParcelado()" ${ui.simParceladoOn?'checked':''}> Parcelar essa compra</label>
+      </div>
+      ${ui.simParceladoOn ? `
+      <div class="row2">
+        <div class="field"><label>Nº de parcelas</label><input type="number" id="simParcelasN" min="2" max="48" value="${ui.simParcelasN||2}"></div>
+      </div>
+      ` : ''}
+      ` : ''}
+      <button class="btn btn-primary" style="margin-top:6px;" onclick="rodarSimulacao()">Simular impacto</button>
+      <div id="simResultado"></div>
+    </div>
+  `;
+  document.getElementById('view-simulador').innerHTML = html;
+}
+
+function gerarSugestoes(ym, categoriaAlvo, valorImpacto){
+  const catGasto = gastoPorCategoria(ym);
+  const saldoAtual = saldoDisponivelMes(ym);
+  const saldoApos = saldoAtual - valorImpacto;
+  const orcCat = Number(state.settings.orcamento[categoriaAlvo]||0);
+  const realCat = catGasto[categoriaAlvo]||0;
+  const realCatApos = realCat + valorImpacto;
+  const estouraCategoria = orcCat>0 && realCatApos > orcCat;
+  const estouraSaldo = saldoApos < 0;
+  let deficit = 0;
+  if(estouraSaldo) deficit = Math.max(deficit, -saldoApos);
+  if(estouraCategoria) deficit = Math.max(deficit, realCatApos-orcCat);
+
+  let sugestoes = [], faltaCobrir = 0;
+  if(deficit>0){
+    const candidatos = FLEX_CATEGORIES.filter(k=>k!==categoriaAlvo).map(k=>{
+      const orc = Number(state.settings.orcamento[k]||0);
+      const real = catGasto[k]||0;
+      return { key:k, restante: Math.max(0, orc-real), orc };
+    }).filter(c=>c.restante>0).sort((a,b)=>b.restante-a.restante);
+    let falta = deficit;
+    candidatos.forEach(c=>{
+      if(falta<=0.5) return;
+      const corte = Math.min(c.restante, falta);
+      const pct = c.orc>0 ? Math.round((corte/c.orc)*100) : 0;
+      sugestoes.push({ categoria:c.key, corte, pct });
+      falta -= corte;
+    });
+    faltaCobrir = Math.max(0, falta);
+  }
+  return { saldoAtual, saldoApos, estouraCategoria, estouraSaldo, deficit, sugestoes, faltaCobrir, orcCat, realCat, realCatApos };
+}
+
+/* Monta a lista de lançamentos hipotéticos (extras) a partir do formulário do simulador */
+function montarExtrasSimulacao(valorTotal, formaTipo, n, boletoVenc, cartaoId){
+  const hoje = todayISO();
+  const extras = [];
+  if(formaTipo==='cartao' && n>1){
+    const valorParcela = valorTotal/n;
+    for(let i=0;i<n;i++){
+      extras.push({ valor: valorParcela, dataCaixa: calcularDataCaixa('cartao', hoje, i, null, cartaoId), mesRef: ymAdd(ymKey(new Date()), i) });
+    }
+  } else {
+    extras.push({ valor: valorTotal, dataCaixa: calcularDataCaixa(formaTipo, hoje, 0, boletoVenc, cartaoId), mesRef: ymKey(new Date()) });
+  }
+  return extras;
+}
+function rodarSimulacao(){
+  const valorTotal = parseMoneyInput(document.getElementById('simValor').value);
+  const desc = document.getElementById('simDesc').value.trim() || 'Gasto simulado';
+  if(!valorTotal || valorTotal<=0){ showToast('Informe um valor válido'); return; }
+  if(!ui.simCategoria){ showToast('Escolha uma categoria'); return; }
+  ui.simParceladoOn = document.getElementById('simParcelado')?.checked || false;
+  const formaTipo = ui.simFormaTipo;
+  const n = (formaTipo==='cartao' && ui.simParceladoOn) ? (parseInt(document.getElementById('simParcelasN').value)||2) : 1;
+  const boletoVenc = document.getElementById('simBoletoVenc')?.value || todayISO();
+  const cartaoId = formaTipo==='cartao' ? (ui.simCartaoId || cartaoPadrao().id) : null;
+  ui.simParcelasN = n;
+  const valorImpactoMes = n>1 ? (valorTotal/n) : valorTotal;
+
+  ui.pendingSim = { valorTotal, desc, formaTipo, n, boletoVenc, cartaoId, categoria: ui.simCategoria, quem: ui.simQuem };
+
+  const ym = ymKey(new Date());
+  const r = gerarSugestoes(ym, ui.simCategoria, valorImpactoMes);
+  const catLabel = CAT_MAP[ui.simCategoria].label;
+
+  // Projeção multi-mês: real (já lançado) vs. simulado (com essa compra)
+  const extras = montarExtrasSimulacao(valorTotal, formaTipo, n, boletoVenc, cartaoId);
+  const hojeYm = ymKey(new Date());
+  const meses = [0,1,2,3,4,5].map(i=>ymAdd(hojeYm, i));
+  const saldoReal = meses.map(m=>saldoContaCorrente(fimDoMesISO(m)));
+  const saldoSimulado = meses.map(m=>saldoContaCorrente(fimDoMesISO(m), extras));
+  const impactoProxMes = saldoReal[1] - saldoSimulado[1];
+
+  let statusClass = 'ok', headline = `✅ Cabe tranquilo no orçamento`;
+  if(r.estouraSaldo || r.estouraCategoria){
+    statusClass = r.faltaCobrir>0 ? 'crit' : 'warn';
+    headline = r.faltaCobrir>0 ? '🚫 Não cabe sem ajustes' : '⚠️ Cabe, mas vai exigir ajustes';
+  }
+
+  let corpo = `
+    <div class="stat-grid" style="margin-top:14px;">
+      <div class="stat-tile"><div class="stat-label">Saldo orçamentário hoje</div><div class="stat-value">${fmtMoneyCompact(r.saldoAtual)}</div></div>
+      <div class="stat-tile"><div class="stat-label">Se confirmar${n>1?' (1ª parcela)':''}</div><div class="stat-value ${r.saldoApos<0?'crit':'good'}">${fmtMoneyCompact(r.saldoApos)}</div></div>
+    </div>
+    <div class="cat-row" style="margin-top:14px;">
+      <div class="top"><div class="name">${CAT_MAP[ui.simCategoria].icon} ${catLabel}</div><div class="nums"><b>${fmtMoney(r.realCatApos)}</b> ${r.orcCat>0?'/ '+fmtMoney(r.orcCat):'(sem orçamento definido)'}</div></div>
+      <div class="track"><div class="fill" style="width:${r.orcCat>0?Math.min(100,(r.realCatApos/r.orcCat)*100):0}%; background:${r.estouraCategoria?colorVar('--critical'):catColor(ui.simCategoria)}"></div></div>
+    </div>
+  `;
+
+  if(r.deficit>0){
+    if(r.sugestoes.length>0){
+      corpo += `<div class="insight warn"><span class="icon">💡</span><span><b>Sugestão do consultor:</b> para caber sem tocar a reserva, ${r.sugestoes.map(s=>`reduza cerca de <b>${s.pct}%</b> do que resta em <b>${CAT_MAP[s.categoria].label}</b> (${fmtMoney(s.corte)})`).join(' e ')} este mês.</span></div>`;
+    }
+    if(r.faltaCobrir>0){
+      corpo += `<div class="insight crit"><span class="icon">🏦</span><span>Mesmo cortando o que dá em outras categorias, ainda faltam <b>${fmtMoney(r.faltaCobrir)}</b> — isso provavelmente sairá da reserva de emergência, ou vale considerar adiar a compra${n>1?' ou parcelar em mais vezes':''}.</span></div>`;
+    }
+  } else {
+    corpo += `<div class="insight good"><span class="icon">👍</span><span>Essa compra cabe no que já está planejado para o mês, sem precisar reduzir outras categorias.</span></div>`;
+  }
+
+  if(impactoProxMes > 0.5){
+    corpo += `<div class="insight warn"><span class="icon">📅</span><span>No mês que vem (<b>${ymLabel(meses[1])}</b>), sua conta corrente projetada cai de <b>${fmtMoney(saldoReal[1])}</b> para <b>${fmtMoney(saldoSimulado[1])}</b> por causa dessa compra.</span></div>`;
+  }
+
+  corpo += `
+    <h2 style="margin-top:18px;">Conta corrente projetada: real × com essa compra</h2>
+    <canvas id="chartSimProjecao" height="220"></canvas>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-swatch" style="background:${colorVar('--series-1')}"></span>Real (já lançado)</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:${colorVar('--series-2')}"></span>Com essa compra</div>
+    </div>
+    <button class="link-btn" style="margin-top:10px;" onclick="ui.simShowTable=!ui.simShowTable; rodarSimulacao();">${ui.simShowTable?'Ocultar tabela':'Ver como tabela'}</button>
+    ${ui.simShowTable ? `
+    <table class="table-view"><thead><tr><th>Mês</th><th>Real</th><th>Com a compra</th></tr></thead><tbody>
+      ${meses.map((m,i)=>`<tr><td>${ymLabel(m)}</td><td class="num">${fmtMoney(saldoReal[i])}</td><td class="num">${fmtMoney(saldoSimulado[i])}</td></tr>`).join('')}
+    </tbody></table>` : ''}
+  `;
+
+  corpo += `
+    <div class="btn-row" style="margin-top:14px;">
+      <button class="btn btn-secondary" onclick="document.getElementById('simResultado').innerHTML=''">Descartar</button>
+      <button class="btn btn-primary" onclick="confirmarSimulacao()">Confirmar e lançar</button>
+    </div>
+  `;
+
+  document.getElementById('simResultado').innerHTML = `<div class="sim-result ${statusClass}"><div class="sim-headline">${headline}</div>${corpo}</div>`;
+
+  makeChart('chartSimProjecao', {
+    type:'bar',
+    data: {
+      labels: meses.map(m=>ymLabel(m).replace(' de ','/').slice(0,7)),
+      datasets: [
+        { label:'Real', data: saldoReal, backgroundColor: colorVar('--series-1'), borderRadius:4 },
+        { label:'Com essa compra', data: saldoSimulado, backgroundColor: colorVar('--series-2'), borderRadius:4 },
+      ],
+    },
+    options: {
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(ctx)=> ` ${ctx.dataset.label}: ${fmtMoney(ctx.parsed.y)}` } } },
+      scales: { x:{ grid:{display:false}, ticks:{color: colorVar('--text-muted')} }, y:{ grid:{color: colorVar('--gridline')}, ticks:{color: colorVar('--text-muted'), callback:(v)=>fmtMoneyCompact(v)} } }
+    }
+  });
+}
+
+function confirmarSimulacao(){
+  const s = ui.pendingSim;
+  if(!s) return;
+  const ym = ymKey(new Date());
+  const formaLabel = PAYMENT_TYPE_MAP[s.formaTipo].label;
+  if(s.n>1){
+    const valorParcela = s.valorTotal/s.n;
+    const grupoId = uid();
+    for(let i=0;i<s.n;i++){
+      state.lancamentos.push({
+        id: uid(), tipo:'despesa', valor: valorParcela, descricao: `${s.desc} (parcela ${i+1}/${s.n})`,
+        categoria: s.categoria, quem: s.quem, forma: formaLabel, formaTipo: s.formaTipo, cartaoId: s.cartaoId, data: todayISO(),
+        dataCaixa: calcularDataCaixa(s.formaTipo, todayISO(), i, null, s.cartaoId),
+        mesRef: ymAdd(ym,i), origem:'simulacao-confirmada', parcelaGrupo: grupoId, parcela:{atual:i+1,total:s.n}, criadoEm: Date.now(),
+      });
+    }
+  } else {
+    state.lancamentos.push({
+      id: uid(), tipo:'despesa', valor: s.valorTotal, descricao: s.desc, categoria: s.categoria,
+      quem: s.quem, forma: formaLabel, formaTipo: s.formaTipo, cartaoId: s.cartaoId, data: todayISO(),
+      dataCaixa: calcularDataCaixa(s.formaTipo, todayISO(), 0, s.boletoVenc, s.cartaoId), mesRef: ym,
+      origem:'simulacao-confirmada', criadoEm: Date.now(),
+    });
+  }
+  saveState();
+  showToast('Gasto confirmado e lançado ✓');
+  ui.simCategoria=null; ui.simParceladoOn=false; ui.simDescStr=''; ui.simValorStr=''; ui.pendingSim=null;
+  showView('dashboard');
+}
+
+/* =========================================================
+   RELATÓRIOS
+========================================================= */
+const PERIOD_PRESETS = {
+  'Este mês': ()=>({de: ymKey(new Date()), ate: ymKey(new Date())}),
+  'Mês passado': ()=>({de: ymAdd(ymKey(new Date()),-1), ate: ymAdd(ymKey(new Date()),-1)}),
+  'Últimos 3 meses': ()=>({de: ymAdd(ymKey(new Date()),-2), ate: ymKey(new Date())}),
+  'Últimos 6 meses': ()=>({de: ymAdd(ymKey(new Date()),-5), ate: ymKey(new Date())}),
+};
+window.__charts = window.__charts || {};
+function makeChart(id, config){
+  try{
+    if(typeof Chart === 'undefined'){
+      const el = document.getElementById(id);
+      if(el){ el.style.display='none'; el.insertAdjacentHTML('afterend', '<div class="hint">Não foi possível carregar os gráficos agora (sem conexão?). Os dados continuam na tabela abaixo.</div>'); }
+      return;
+    }
+    if(window.__charts[id]) window.__charts[id].destroy();
+    const el = document.getElementById(id);
+    if(!el) return;
+    window.__charts[id] = new Chart(el, config);
+  }catch(e){ console.error('chart error', id, e); }
+}
+function foldToOther(entries, max=8){
+  const sorted = [...entries].sort((a,b)=>b.value-a.value);
+  if(sorted.length<=max) return sorted;
+  const head = sorted.slice(0,max-1);
+  const tailSum = sorted.slice(max-1).reduce((s,e)=>s+e.value,0);
+  head.push({ key:'outros', label:'Outros', value: tailSum, color: colorVar('--series-other') });
+  return head;
+}
+/* ymRefLancamento: qual "mês" um lançamento pertence, conforme o modo do relatório.
+   'mes' (orçamentário) usa mesRef — o mês em que a compra foi orçada/decidida.
+   'hoje' (real/caixa) usa o mês da dataCaixa — quando o dinheiro de fato mexeu na
+   conta (receita: data do recebimento; despesa: vencimento da fatura/boleto ou data
+   da compra p/ Pix/débito). É isso que dá a "foto real" do que já aconteceu. */
+function ymRefLancamento(l, modo){
+  if(modo==='hoje') return ymFromISO(l.tipo==='receita' ? l.data : (l.dataCaixa||l.data));
+  return l.mesRef;
+}
+function gastoPorCategoriaPeriodo(de, ate, pessoa, categoriaFiltro, modo){
+  modo = modo || 'mes';
+  const out = {}; CATEGORIES.forEach(c=>out[c.key]=0);
+  state.lancamentos.filter(l=> l.tipo==='despesa' && ymRefLancamento(l,modo)>=de && ymRefLancamento(l,modo)<=ate &&
+    (pessoa==='todos'||l.quem===pessoa) && (categoriaFiltro==='todos'||l.categoria===categoriaFiltro)
+  ).forEach(l=>{ out[l.categoria]=(out[l.categoria]||0)+Number(l.valor||0); });
+  return out;
+}
+function transacoesFiltradas(){
+  const modo = ui.relModo||'mes';
+  return state.lancamentos.filter(l=>
+    ymRefLancamento(l,modo)>=ui.relYmDe && ymRefLancamento(l,modo)<=ui.relYmAte &&
+    (ui.relPessoa==='todos'||l.quem===ui.relPessoa) &&
+    (ui.relCategoria==='todos'||l.categoria===ui.relCategoria)
+  ).sort((a,b)=> b.data.localeCompare(a.data) || b.criadoEm-a.criadoEm);
+}
+function evolucaoMensal(nMeses=6){
+  const atualYm = ymKey(new Date());
+  const meses = []; for(let i=nMeses-1;i>=0;i--) meses.push(ymAdd(atualYm,-i));
+  const totalPorCat = {}; CATEGORIES.forEach(c=>totalPorCat[c.key]=0);
+  meses.forEach(ym=>{ const g=gastoPorCategoria(ym); Object.keys(g).forEach(k=>totalPorCat[k]=(totalPorCat[k]||0)+g[k]); });
+  const entries = CATEGORIES.filter(c=>c.key!=='variavel' && totalPorCat[c.key]>0).map(c=>({key:c.key,label:c.label,value:totalPorCat[c.key],color:catColor(c.key)}));
+  const folded = foldToOther(entries, 8);
+  const chosen = new Set(folded.map(f=>f.key));
+  const datasets = folded.map(f=>({
+    label: f.label,
+    data: meses.map(ym=>{
+      if(f.key!=='outros') return gastoPorCategoria(ym)[f.key]||0;
+      const g = gastoPorCategoria(ym); let s=0;
+      CATEGORIES.forEach(c=>{ if(c.key!=='variavel' && !chosen.has(c.key)) s+=g[c.key]||0; });
+      return s;
+    }),
+    backgroundColor: f.color, borderColor: colorVar('--surface-card'), borderWidth: 2, borderRadius: 4,
+  }));
+  return { meses, datasets, folded };
+}
+
+if(!ui.relYmDe){ ui.relYmDe = ymKey(new Date()); ui.relYmAte = ymKey(new Date()); ui.relPreset='Este mês'; ui.relShowTable=false; }
+
+function trocarRelModo(modo){ ui.relModo = modo; renderRelatorios(); }
+function renderRelatorios(){
+  ui.relModo = ui.relModo || 'mes';
+  const modo = ui.relModo;
+  const filtradas = transacoesFiltradas();
+  const despesasFiltradas = filtradas.filter(l=>l.tipo==='despesa');
+  const receitasFiltradas = filtradas.filter(l=>l.tipo==='receita');
+  const totalDespesas = despesasFiltradas.reduce((s,l)=>s+Number(l.valor),0);
+  // No modo "Mês" (orçamentário), a renda fixa prevista conta inteira para cada mês do
+  // período. No modo "Hoje" (real), só entra o que já foi de fato recebido (rendaFixaRecebidaAteHoje).
+  const totalReceitasFixas = modo==='hoje'
+    ? somaRendaFixaEntrePeriodo(inicioDoMesISO(ui.relYmDe), (ui.relYmAte>=ymKey(new Date()) ? todayISO() : fimDoMesISO(ui.relYmAte)))
+    : rendaFixaTotalMes()*monthsBetween(ui.relYmDe,ui.relYmAte);
+  const totalReceitas = receitasFiltradas.reduce((s,l)=>s+Number(l.valor),0) + totalReceitasFixas;
+
+  const catOut = gastoPorCategoriaPeriodo(ui.relYmDe, ui.relYmAte, ui.relPessoa, 'todos', modo);
+  const catEntries = CATEGORIES.filter(c=>c.key!=='variavel' && catOut[c.key]>0).map(c=>({key:c.key,label:c.label,icon:c.icon,value:catOut[c.key],color:catColor(c.key)}));
+  const catFolded = foldToOther(catEntries, 8);
+  const somaCat = catEntries.reduce((s,e)=>s+e.value,0) || 1;
+
+  const evo = evolucaoMensal(6);
+
+  const html = `
+    <div class="card">
+      <h2>Visão</h2>
+      <div class="segmented">
+        <button class="${modo==='hoje'?'active':''}" onclick="trocarRelModo('hoje')">📍 Hoje (real)</button>
+        <button class="${modo==='mes'?'active':''}" onclick="trocarRelModo('mes')">📅 Mês (orçado)</button>
+      </div>
+      <div class="hint" style="margin-top:8px;">${modo==='hoje'
+        ? 'Considera só o que já bateu de fato na conta (data de recebimento/vencimento), sem projetar nada que ainda vai vencer.'
+        : 'Considera tudo que foi orçado/lançado para o mês, independente de quando o dinheiro sai da conta.'}</div>
+    </div>
+
+    <div class="card">
+      <h2>Período</h2>
+      <div class="filter-bar">
+        ${Object.keys(PERIOD_PRESETS).map(p=>`<button class="filter-pill ${ui.relPreset===p?'active':''}" onclick="aplicarPresetPeriodo('${p}')">${p}</button>`).join('')}
+      </div>
+      <div class="row2">
+        <div class="field"><label>De</label><input type="month" value="${ui.relYmDe}" onchange="ui.relYmDe=this.value;ui.relPreset=null;renderRelatorios()"></div>
+        <div class="field"><label>Até</label><input type="month" value="${ui.relYmAte}" onchange="ui.relYmAte=this.value;ui.relPreset=null;renderRelatorios()"></div>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-pill ${ui.relPessoa==='todos'?'active':''}" onclick="ui.relPessoa='todos';renderRelatorios()">Todos</button>
+        ${PEOPLE.map(p=>`<button class="filter-pill ${ui.relPessoa===p.key?'active':''}" onclick="ui.relPessoa='${p.key}';renderRelatorios()">${p.icon} ${p.label}</button>`).join('')}
+      </div>
+      <div class="filter-bar">
+        <button class="filter-pill ${ui.relCategoria==='todos'?'active':''}" onclick="ui.relCategoria='todos';renderRelatorios()">Todas categorias</button>
+        ${CATEGORIES.filter(c=>c.key!=='variavel').map(c=>`<button class="filter-pill ${ui.relCategoria===c.key?'active':''}" onclick="ui.relCategoria='${c.key}';renderRelatorios()">${c.icon} ${c.label}</button>`).join('')}
+      </div>
+      <div class="segmented" style="margin-top:14px;">
+        <button class="${ui.relView==='sintetico'?'active':''}" onclick="ui.relView='sintetico';renderRelatorios()">Sintético</button>
+        <button class="${ui.relView==='detalhado'?'active':''}" onclick="ui.relView='detalhado';renderRelatorios()">Detalhado</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stat-grid">
+        <div class="stat-tile"><div class="stat-label">Receitas no período</div><div class="stat-value good">${fmtMoneyCompact(totalReceitas)}</div></div>
+        <div class="stat-tile"><div class="stat-label">Despesas no período</div><div class="stat-value crit">${fmtMoneyCompact(totalDespesas)}</div></div>
+      </div>
+    </div>
+
+    ${ui.relView==='sintetico' ? `
+    <div class="card">
+      <h2>Gastos por categoria</h2>
+      ${catEntries.length===0 ? `<div class="empty-state"><div class="ic">📭</div>Sem despesas nesse período/filtro.</div>` : `
+      <div style="max-width:260px;margin:0 auto;"><canvas id="chartCategoria" height="260"></canvas></div>
+      <div class="legend">
+        ${catFolded.map(f=>`<div class="legend-item"><span class="legend-swatch" style="background:${f.color}"></span>${f.label} · ${fmtMoneyCompact(f.value)} (${Math.round(f.value/somaCat*100)}%)</div>`).join('')}
+      </div>
+      <button class="link-btn" style="margin-top:12px;" onclick="ui.relShowTable=!ui.relShowTable;renderRelatorios()">${ui.relShowTable?'Ocultar tabela':'Ver como tabela'}</button>
+      ${ui.relShowTable ? `
+      <table class="table-view"><thead><tr><th>Categoria</th><th>Valor</th><th>%</th></tr></thead><tbody>
+        ${catEntries.sort((a,b)=>b.value-a.value).map(e=>`<tr><td>${e.icon} ${e.label}</td><td class="num">${fmtMoney(e.value)}</td><td class="num">${Math.round(e.value/somaCat*100)}%</td></tr>`).join('')}
+      </tbody></table>` : ''}
+      `}
+    </div>
+
+    <div class="card">
+      <h2>Evolução dos últimos 6 meses</h2>
+      <canvas id="chartEvolucao" height="220"></canvas>
+      <div class="legend">
+        ${evo.folded.map(f=>`<div class="legend-item"><span class="legend-swatch" style="background:${f.color}"></span>${f.label}</div>`).join('')}
+      </div>
+    </div>
+    ` : `
+    <div class="card">
+      <h2>Lançamentos <span class="hint">· ${filtradas.length} no período</span></h2>
+      ${filtradas.length===0 ? `<div class="empty-state"><div class="ic">📭</div>Nenhum lançamento encontrado.</div>` :
+      filtradas.map(l=>renderTxnItem(l)).join('')}
+    </div>
+    `}
+  `;
+  document.getElementById('view-relatorios').innerHTML = html;
+
+  if(ui.relView==='sintetico' && catEntries.length>0){
+    makeChart('chartCategoria', {
+      type:'doughnut',
+      data: { labels: catFolded.map(f=>f.label), datasets:[{ data: catFolded.map(f=>f.value), backgroundColor: catFolded.map(f=>f.color), borderColor: colorVar('--surface-card'), borderWidth: 2 }] },
+      options: { plugins: { legend: { display:false }, tooltip: { callbacks: { label: (ctx)=> ` ${ctx.label}: ${fmtMoney(ctx.parsed)}` } } }, cutout:'62%' }
+    });
+  }
+  if(ui.relView==='sintetico'){
+    makeChart('chartEvolucao', {
+      type:'bar',
+      data: { labels: evo.meses.map(m=>ymLabel(m).replace(' de ',"/").slice(0,7)), datasets: evo.datasets },
+      options: {
+        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(ctx)=> ` ${ctx.dataset.label}: ${fmtMoney(ctx.parsed.y)}` } } },
+        scales: { x: { stacked:true, grid:{display:false}, ticks:{color: colorVar('--text-muted')} }, y: { stacked:true, grid:{color: colorVar('--gridline')}, ticks:{color: colorVar('--text-muted'), callback:(v)=>fmtMoneyCompact(v)} } }
+      }
+    });
+  }
+}
+function monthsBetween(de, ate){
+  const [y1,m1]=de.split('-').map(Number), [y2,m2]=ate.split('-').map(Number);
+  return (y2-y1)*12+(m2-m1)+1;
+}
+function aplicarPresetPeriodo(nome){
+  const r = PERIOD_PRESETS[nome]();
+  ui.relYmDe = r.de; ui.relYmAte = r.ate; ui.relPreset = nome;
+  renderRelatorios();
+}
+function renderTxnItem(l){
+  const cat = CAT_MAP[l.categoria] || CAT_MAP.outros;
+  const origemIcon = l.origem==='voz' ? '🎙️' : l.origem==='fatura' ? '📎' : l.origem==='simulacao-confirmada' ? '🔮' : '';
+  const quemLabel = PEOPLE.find(p=>p.key===l.quem)?.label || '';
+  const venceInfo = (l.dataCaixa && l.dataCaixa!==l.data) ? ` · cai na conta em ${fmtDate(l.dataCaixa)}` : '';
+  const cartaoInfo = (l.formaTipo==='cartao' && state.cartoes.length>1) ? ` · ${getCartao(l.cartaoId).nome}` : '';
+  return `
+    <button type="button" class="txn-item" onclick="abrirDetalheLancamento('${l.id}')">
+      <div class="txn-icon" style="background:${catColor(cat.key)}">${cat.icon}</div>
+      <div class="txn-mid">
+        <div class="txn-desc">${l.descricao} ${origemIcon}</div>
+        <div class="txn-meta">${fmtDate(l.data)} · ${cat.label}${quemLabel? ' · '+quemLabel:''}${l.forma?' · '+l.forma:''}${cartaoInfo}${l.parcela?` · ${l.parcela.atual}/${l.parcela.total}`:''}${venceInfo}</div>
+      </div>
+      <div class="txn-val ${l.tipo==='receita'?'income':''}">${l.tipo==='receita'?'+':'-'}${fmtMoneyCompact(l.valor)}</div>
+      <div class="txn-chevron">›</div>
+    </button>`;
+}
+
+/* =========================================================
+   LANÇAMENTOS — editar / excluir
+========================================================= */
+function abrirDetalheLancamento(lancId){
+  const l = state.lancamentos.find(x=>x.id===lancId);
+  if(!l) return;
+  const isReceita = l.tipo==='receita';
+  const catOptions = CATEGORIES.filter(c=> isReceita ? c.key==='variavel' : c.key!=='variavel');
+  openSheet(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><h3>${isReceita?'Editar receita':'Editar despesa'}</h3><button class="sheet-close" onclick="closeSheet()">✕</button></div>
+    <div class="field"><label>Descrição</label><input type="text" id="editLancDesc" value="${(l.descricao||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field">
+      <label>Valor</label>
+      <div class="amount-wrap"><span class="prefix">R$</span><input class="amount-input" type="text" inputmode="decimal" id="editLancValor" value="${String(l.valor).replace('.',',')}"></div>
+    </div>
+    <div class="field"><label>Data</label><input type="date" id="editLancData" value="${l.data}"></div>
+    ${!isReceita ? `
+    <div class="field">
+      <label>Categoria</label>
+      <div class="chip-group">${catOptions.map(c=>`<button type="button" class="chip ${c.key===l.categoria?'selected':''}" onclick="chipSelect(this,'editLancCategoria','${c.key}')">${c.icon} ${c.label}</button>`).join('')}</div>
+    </div>` : ''}
+    <div class="field">
+      <label>Quem</label>
+      <div class="chip-group">${PEOPLE.map(p=>`<button type="button" class="chip ${p.key===l.quem?'selected':''}" onclick="chipSelect(this,'editLancQuem','${p.key}')">${p.icon} ${p.label}</button>`).join('')}</div>
+    </div>
+    ${(!isReceita && l.formaTipo==='cartao' && state.cartoes.length>1) ? `
+    <div class="field">
+      <label>Qual cartão</label>
+      <div class="chip-group">${state.cartoes.map(c=>`<button type="button" class="chip ${(l.cartaoId||cartaoPadrao().id)===c.id?'selected':''}" onclick="chipSelect(this,'editLancCartaoId','${c.id}')">💳 ${c.nome}</button>`).join('')}</div>
+    </div>` : ''}
+    ${l.parcela ? `<div class="hint" style="margin:6px 0 12px;">Parcela ${l.parcela.atual}/${l.parcela.total} — editar aqui altera só esta parcela. Para excluir todas de uma vez, use "Excluir parcelamento inteiro" abaixo.</div>` : ''}
+    <button class="btn btn-primary" onclick="salvarEdicaoLancamento('${l.id}')">Salvar alterações</button>
+    <button class="link-btn" style="margin-top:14px; color:var(--critical);" onclick="excluirLancamento('${l.id}', false)">Excluir este lançamento</button>
+    ${l.parcela ? `<button class="link-btn" style="margin-top:10px; color:var(--critical);" onclick="excluirLancamento('${l.id}', true)">Excluir parcelamento inteiro (${l.parcela.total} parcelas)</button>` : ''}
+  `);
+  ui.editLancCategoria = l.categoria;
+  ui.editLancQuem = l.quem;
+  ui.editLancCartaoId = l.cartaoId || cartaoPadrao().id;
+}
+function salvarEdicaoLancamento(lancId){
+  const l = state.lancamentos.find(x=>x.id===lancId);
+  if(!l) return;
+  const desc = document.getElementById('editLancDesc').value.trim();
+  const valor = parseMoneyInput(document.getElementById('editLancValor').value);
+  const data = document.getElementById('editLancData').value;
+  if(!valor || valor<=0){ showToast('Informe um valor válido'); return; }
+  if(!data){ showToast('Informe uma data válida'); return; }
+  l.descricao = desc || l.descricao;
+  l.valor = valor;
+  l.data = data;
+  l.mesRef = ymFromISO(data);
+  if(l.tipo==='despesa'){
+    l.categoria = ui.editLancCategoria || l.categoria;
+    l.quem = ui.editLancQuem || l.quem;
+    if(l.formaTipo==='cartao'){
+      l.cartaoId = ui.editLancCartaoId || l.cartaoId || cartaoPadrao().id;
+    }
+    if(l.formaTipo){
+      const boletoVenc = l.formaTipo==='boleto' ? (l.dataCaixa||data) : null;
+      l.dataCaixa = calcularDataCaixa(l.formaTipo, data, l.parcela ? l.parcela.atual-1 : 0, boletoVenc, l.cartaoId);
+    }
+  } else {
+    l.quem = ui.editLancQuem || l.quem;
+  }
+  saveState();
+  closeSheet();
+  showToast('Lançamento atualizado ✓');
+}
+function excluirLancamento(lancId, grupoInteiro){
+  const l = state.lancamentos.find(x=>x.id===lancId);
+  if(!l) return;
+  if(grupoInteiro && l.parcelaGrupo){
+    if(!confirm(`Excluir todas as ${l.parcela?.total||''} parcelas deste parcelamento?`)) return;
+    state.lancamentos = state.lancamentos.filter(x=>x.parcelaGrupo!==l.parcelaGrupo);
+  } else {
+    if(!confirm('Excluir este lançamento?')) return;
+    state.lancamentos = state.lancamentos.filter(x=>x.id!==lancId);
+  }
+  saveState();
+  closeSheet();
+  showToast('Lançamento excluído ✓');
+}
+
+/* =========================================================
+   POUPANÇA — UI
+========================================================= */
+const POTE_ICONS = ['🐷','🏦','✈️','🏠','🚨','🎓','🚗','🎁'];
+function renderPoupanca(){
+  const potes = state.potes || [];
+  const total = totalPoupadoGeral();
+  const html = `
+    <div class="card hero-balance">
+      <div class="label">Total poupado</div>
+      <div class="value pos">${fmtMoney(total)}</div>
+      <div class="sub">${potes.length} pote${potes.length===1?'':'s'} · rendimento calculado automaticamente pelo tempo decorrido</div>
+    </div>
+
+    ${potes.length===0 ? `<div class="card"><div class="empty-state"><div class="ic">🐷</div>Você ainda não tem nenhum pote de poupança.</div></div>` : ''}
+
+    ${potes.map(p=>{
+      const saldo = calcularSaldoPote(p);
+      const aportado = totalAportadoPote(p);
+      const rendimento = saldo - aportado;
+      return `
+      <div class="card">
+        <h2>${p.icone||'🐷'} ${p.nome} <span class="hint">· ${p.taxaMensalPct||0}% a.m.</span></h2>
+        <div class="stat-grid">
+          <div class="stat-tile">
+            <div class="stat-label">Saldo atual</div>
+            <div class="stat-value good">${fmtMoneyCompact(saldo)}</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">Rendimento acumulado</div>
+            <div class="stat-value ${rendimento>=0?'good':'crit'}">${fmtMoneyCompact(rendimento)}</div>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:12px;">
+          <button class="btn btn-secondary" onclick="abrirTransferSheet('${p.id}','aporte')">↓ Transferir da conta</button>
+          <button class="btn btn-secondary" onclick="abrirTransferSheet('${p.id}','resgate')">↑ Resgatar p/ conta</button>
+        </div>
+        <button class="link-btn" style="margin-top:10px;" onclick="abrirEditarPote('${p.id}')">Editar pote</button>
+        <button class="link-btn" style="margin-top:10px; margin-left:16px; color:var(--critical);" onclick="removerPote('${p.id}')">Excluir</button>
+      </div>`;
+    }).join('')}
+
+    <div class="card">
+      <button class="btn btn-primary" onclick="abrirNovoPote()">+ Novo pote de poupança</button>
+    </div>
+  `;
+  document.getElementById('view-poupanca').innerHTML = html;
+}
+function abrirNovoPote(){
+  openSheet(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><h3>Novo pote de poupança</h3><button class="sheet-close" onclick="closeSheet()">✕</button></div>
+    <div class="field"><label>Nome</label><input type="text" id="poteNome" placeholder="Ex: Reserva de emergência"></div>
+    <div class="field">
+      <label>Ícone</label>
+      <div class="chip-group">${POTE_ICONS.map(ic=>`<button type="button" class="chip ${ic===POTE_ICONS[0]?'selected':''}" onclick="chipSelect(this,'novoPoteIcone','${ic}')">${ic}</button>`).join('')}</div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Saldo já existente</label><input type="text" id="poteSaldoBase" inputmode="decimal" placeholder="0,00"></div>
+      <div class="field"><label>Taxa mensal (%)</label><input type="text" id="poteTaxa" inputmode="decimal" placeholder="ex: 0,80"></div>
+    </div>
+    <div class="field"><label>Data desse saldo</label><input type="date" id="poteDataBase" value="${todayISO()}"></div>
+    <button class="btn btn-primary" onclick="salvarNovoPote()">Criar pote</button>
+  `);
+  ui.novoPoteIcone = POTE_ICONS[0];
+}
+function salvarNovoPote(){
+  const nome = document.getElementById('poteNome').value.trim();
+  if(!nome){ showToast('Dê um nome ao pote'); return; }
+  const saldoBase = parseMoneyInput(document.getElementById('poteSaldoBase').value) || 0;
+  const taxa = parseMoneyInput(document.getElementById('poteTaxa').value) || 0;
+  const dataBase = document.getElementById('poteDataBase').value || todayISO();
+  state.potes.push({ id: uid(), nome, icone: ui.novoPoteIcone||'🐷', taxaMensalPct: taxa, saldoBase, dataBase });
+  saveState();
+  closeSheet();
+  showToast('Pote criado ✓');
+  renderPoupanca();
+}
+function abrirEditarPote(poteId){
+  const p = state.potes.find(x=>x.id===poteId);
+  if(!p) return;
+  openSheet(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><h3>Editar pote</h3><button class="sheet-close" onclick="closeSheet()">✕</button></div>
+    <div class="field"><label>Nome</label><input type="text" id="editPoteNome" value="${p.nome}"></div>
+    <div class="field"><label>Taxa mensal (%)</label><input type="text" id="editPoteTaxa" inputmode="decimal" value="${String(p.taxaMensalPct||0).replace('.',',')}"></div>
+    <button class="btn btn-primary" onclick="salvarEdicaoPote('${p.id}')">Salvar</button>
+  `);
+}
+function salvarEdicaoPote(poteId){
+  const p = state.potes.find(x=>x.id===poteId);
+  if(!p) return;
+  p.nome = document.getElementById('editPoteNome').value.trim() || p.nome;
+  p.taxaMensalPct = parseMoneyInput(document.getElementById('editPoteTaxa').value) || 0;
+  saveState();
+  closeSheet();
+  renderPoupanca();
+}
+function removerPote(poteId){
+  if(!confirm('Excluir este pote? O histórico de aportes dele também será apagado.')) return;
+  state.potes = state.potes.filter(p=>p.id!==poteId);
+  state.movimentosPoupanca = (state.movimentosPoupanca||[]).filter(m=>m.poteId!==poteId);
+  saveState();
+  renderPoupanca();
+}
+function abrirTransferSheet(poteId, tipo){
+  const p = state.potes.find(x=>x.id===poteId);
+  if(!p) return;
+  const saldoConta = saldoContaCorrenteHoje();
+  const saldoPote = calcularSaldoPote(p);
+  openSheet(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><h3>${tipo==='aporte'?'Transferir para':'Resgatar de'} ${p.icone} ${p.nome}</h3><button class="sheet-close" onclick="closeSheet()">✕</button></div>
+    <div class="hint" style="margin-bottom:12px;">${tipo==='aporte' ? `Saldo em conta hoje: ${fmtMoney(saldoConta)}` : `Saldo neste pote: ${fmtMoney(saldoPote)}`}</div>
+    <div class="field">
+      <label>Valor</label>
+      <div class="amount-wrap"><span class="prefix">R$</span><input class="amount-input" type="text" inputmode="decimal" id="transferValor" placeholder="0,00"></div>
+    </div>
+    <div class="field"><label>Data</label><input type="date" id="transferData" value="${todayISO()}"></div>
+    <button class="btn btn-primary" onclick="confirmarTransferPoupanca('${poteId}','${tipo}')">Confirmar</button>
+  `);
+}
+function confirmarTransferPoupanca(poteId, tipo){
+  const valor = parseMoneyInput(document.getElementById('transferValor').value);
+  if(!valor || valor<=0){ showToast('Informe um valor válido'); return; }
+  const data = document.getElementById('transferData').value || todayISO();
+  state.movimentosPoupanca.push({ id: uid(), poteId, tipo, valor, data, origem:'manual', criadoEm: Date.now() });
+  saveState();
+  closeSheet();
+  showToast(tipo==='aporte' ? 'Valor transferido para a poupança ✓' : 'Valor resgatado para a conta ✓');
+  renderPoupanca();
+}
+
+/* =========================================================
+   CONFIG
+========================================================= */
+function renderConfig(){
+  const renda = state.settings.rendaFixa;
+  const totalRenda = rendaFixaTotalMes();
+  const totalOrc = orcadoTotalMes();
+  const fb = state.settings.firebase;
+  const html = `
+    <div class="card settings-group" style="margin-bottom:0;">
+      <h3>Renda fixa mensal</h3>
+      ${renda.map(r=>`
+        <div class="settings-row">
+          <div style="flex:1;">
+            <input type="text" value="${r.desc}" style="width:100%;text-align:left;margin-bottom:6px;" onchange="atualizarRendaFixa('${r.id}','desc',this.value)">
+            <div class="st-sub">Dia <input type="number" min="1" max="31" value="${r.dia}" style="width:52px;text-align:center;padding:3px 4px;" onchange="atualizarRendaFixa('${r.id}','dia',this.value)"> do mês</div>
+          </div>
+          <input type="number" value="${r.valor}" onchange="atualizarRendaFixa('${r.id}','valor',this.value)">
+          <button class="link-btn" style="color:var(--critical)" onclick="removerRendaFixa('${r.id}')">✕</button>
+        </div>`).join('')}
+      <button class="link-btn" style="margin-top:10px;" onclick="adicionarRendaFixa()">+ Adicionar renda fixa</button>
+      <div class="settings-row" style="border-top:1px solid var(--gridline); margin-top:8px; padding-top:12px;">
+        <div class="st-label">Total fixo mensal</div>
+        <div class="st-label">${fmtMoney(totalRenda)}</div>
+      </div>
+      <div class="hint">Receitas variáveis (13º, PLR, vendas) são lançadas na aba <b>Lançar</b>.</div>
+    </div>
+
+    <div class="card settings-group" style="margin-bottom:0;">
+      <h3>Conta corrente</h3>
+      <p class="hint" style="margin-bottom:10px;">Usado para calcular o saldo real projetado (diferente do orçamentário). Informe o saldo que está no seu banco hoje e toque em Salvar.</p>
+      <div class="settings-row">
+        <div class="st-label">Saldo atual da conta</div>
+        <input type="number" id="cfgSaldoInicial" step="0.01" value="${state.settings.contaCorrente.saldoInicial}">
+      </div>
+      <div class="settings-row">
+        <div class="st-label">Data de referência<div class="st-sub">A data em que esse saldo era válido</div></div>
+        <input type="date" id="cfgDataReferencia" value="${state.settings.contaCorrente.dataReferencia}">
+      </div>
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="salvarContaCorrente()">Salvar saldo da conta</button>
+      ${state.settings.contaCorrente.configurado ? `<div class="hint" style="margin-top:8px;">Salvo pela última vez com saldo ${fmtMoney(state.settings.contaCorrente.saldoInicial)} em ${fmtDate(state.settings.contaCorrente.dataReferencia)}.</div>` : ''}
+    </div>
+
+    <div class="card settings-group" style="margin-bottom:0;">
+      <h3>Cartões de crédito</h3>
+      <p class="hint" style="margin-bottom:10px;">Cadastre cada cartão com seu próprio ciclo de fechamento e vencimento. Ao lançar uma compra no cartão, você escolhe qual deles usou.</p>
+      ${(state.cartoes||[]).map(c=>`
+        <div class="settings-row" style="flex-wrap:wrap;">
+          <input type="text" style="flex:1 1 100%; margin-bottom:8px; font-weight:600;" value="${(c.nome||'').replace(/"/g,'&quot;')}" placeholder="Nome do cartão (ex: Nubank)" onchange="atualizarCartao('${c.id}','nome',this.value)">
+          <div class="st-label" style="flex:1;">Fecha dia <input type="number" min="1" max="31" value="${c.diaFechamento}" style="width:52px;text-align:center;padding:3px 4px;" onchange="atualizarCartao('${c.id}','diaFechamento',this.value)"></div>
+          <div class="st-label" style="flex:1;">Vence dia <input type="number" min="1" max="31" value="${c.diaVencimento}" style="width:52px;text-align:center;padding:3px 4px;" onchange="atualizarCartao('${c.id}','diaVencimento',this.value)"></div>
+          ${(state.cartoes||[]).length>1 ? `<button class="link-btn" style="color:var(--critical); margin-left:10px;" onclick="removerCartao('${c.id}')">Excluir</button>` : ''}
+        </div>`).join('')}
+      <button class="link-btn" style="margin-top:10px;" onclick="adicionarCartao()">+ Adicionar cartão</button>
+    </div>
+
+    <div class="card settings-group" style="margin-bottom:0;">
+      <h3>Categorias</h3>
+      <p class="hint" style="margin-bottom:10px;">Crie, renomeie ou exclua categorias de despesa. "Renda variável" e "Outros" são fixas e não podem ser excluídas.</p>
+      ${CATEGORIES.filter(c=>c.key!=='variavel').map(c=>`
+        <div class="settings-row">
+          <div class="txn-icon" style="background:${catColor(c.key)}; width:30px; height:30px; font-size:14px;">${c.icon}</div>
+          <div class="st-label" style="flex:1; margin-left:10px;">${c.label}</div>
+          <button class="link-btn" onclick="abrirEditarCategoria('${c.key}')">Editar</button>
+          ${!c.fixa ? `<button class="link-btn" style="color:var(--critical); margin-left:14px;" onclick="excluirCategoria('${c.key}')">Excluir</button>` : ''}
+        </div>`).join('')}
+      <button class="link-btn" style="margin-top:10px;" onclick="abrirNovaCategoria()">+ Nova categoria</button>
+    </div>
+
+    <div class="card settings-group" style="margin-bottom:0;">
+      <h3>Orçamento por categoria <span class="hint">· mensal</span></h3>
+      ${CATEGORIES.filter(c=>c.key!=='variavel').map(c=>`
+        <div class="settings-row">
+          <div class="st-label">${c.icon} ${c.label}</div>
+          <input type="number" value="${state.settings.orcamento[c.key]||0}" onchange="atualizarOrcamento('${c.key}', this.value)">
+        </div>`).join('')}
+      <div class="settings-row" style="border-top:1px solid var(--gridline); margin-top:8px; padding-top:12px;">
+        <div class="st-label">Total orçado</div>
+        <div class="st-label ${totalOrc>totalRenda?'':''}" style="color:${totalOrc>totalRenda?'var(--critical)':'var(--text-primary)'}">${fmtMoney(totalOrc)} <span class="hint">/ ${fmtMoney(totalRenda)}</span></div>
+      </div>
+      ${totalOrc>totalRenda ? `<div class="insight crit" style="margin-top:10px;"><span class="icon">⚠️</span><span>O total orçado (${fmtMoney(totalOrc)}) já é maior que sua renda fixa (${fmtMoney(totalRenda)}) — isso por si só garante rombo todo mês.</span></div>` : ''}
+      <button class="link-btn" style="margin-top:10px;" onclick="sugerirOrcamentoAutomatico()">💡 Sugerir orçamento automático</button>
+    </div>
+
+    <div class="card settings-group" style="margin-bottom:0;">
+      <h3>Sincronizar entre aparelhos</h3>
+      <p class="hint" style="margin-bottom:12px;">Opcional. Ative para ver os mesmos lançamentos no seu celular e no da Luciana em tempo real, usando um banco gratuito (Firebase). Veja o passo a passo que te enviei junto com o app.</p>
+      ${fb ? `
+        <div class="insight good"><span class="icon">✅</span><span>Sincronização ativa · código da família: <b>${fb.familyCode}</b></span></div>
+        <button class="btn btn-secondary" style="margin-top:10px;" onclick="desconectarSync()">Desconectar deste aparelho</button>
+      ` : `
+        <div class="field"><label>API Key</label><input type="text" id="fbApiKey" placeholder="AIzaSy..."></div>
+        <div class="field"><label>Project ID</label><input type="text" id="fbProjectId" placeholder="orcamento-cabrera"></div>
+        <div class="field"><label>App ID</label><input type="text" id="fbAppId" placeholder="1:1234:web:abcd"></div>
+        <div class="field"><label>Código da família</label><input type="text" id="fbFamilyCode" placeholder="ex: cabrera2026" value="cabrera-familia"></div>
+        <button class="btn btn-primary" onclick="salvarConfigSync()">Conectar sincronização</button>
+      `}
+    </div>
+
+    <div class="card settings-group" style="margin-bottom:0;">
+      <h3>Backup manual</h3>
+      <p class="hint" style="margin-bottom:12px;">Mesmo sem sincronização automática, você pode exportar um arquivo e importar em outro aparelho.</p>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="exportarBackup()">Exportar backup</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">Importar backup</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importarBackup(event)">
+    </div>
+
+    <div class="card settings-group" style="margin-bottom:0;">
+      <h3>Aparência</h3>
+      <div class="segmented">
+        <button class="${state.settings.theme==='auto'?'active':''}" onclick="mudarTema('auto')">Automático</button>
+        <button class="${state.settings.theme==='light'?'active':''}" onclick="mudarTema('light')">Claro</button>
+        <button class="${state.settings.theme==='dark'?'active':''}" onclick="mudarTema('dark')">Escuro</button>
+      </div>
+    </div>
+
+    <div class="card settings-group" style="margin-bottom:0;">
+      <h3>Dados</h3>
+      <button class="btn btn-danger" onclick="zerarDados()">Apagar todos os dados deste aparelho</button>
+    </div>
+  `;
+  document.getElementById('view-config').innerHTML = html;
+}
+function atualizarRendaFixa(id, campo, valor){
+  const item = state.settings.rendaFixa.find(r=>r.id===id);
+  if(!item) return;
+  item[campo] = (campo==='valor'||campo==='dia') ? Number(valor) : valor;
+  saveState();
+}
+function removerRendaFixa(id){ state.settings.rendaFixa = state.settings.rendaFixa.filter(r=>r.id!==id); saveState(); renderConfig(); }
+function adicionarRendaFixa(){ state.settings.rendaFixa.push({id:uid(), dia:5, valor:0, desc:'Nova receita fixa'}); saveState(); renderConfig(); }
+/* =========================================================
+   CATEGORIAS — criar / editar / excluir
+========================================================= */
+function slugifyCategoria(label){
+  let base = (label||'').trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'') // remove acentos
+    .replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+  if(!base) base = 'categoria';
+  let key = base, i = 2;
+  const usados = new Set((state.categorias||[]).map(c=>c.key));
+  while(usados.has(key)){ key = `${base}-${i}`; i++; }
+  return key;
+}
+function abrirNovaCategoria(){
+  openSheet(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><h3>Nova categoria</h3><button class="sheet-close" onclick="closeSheet()">✕</button></div>
+    <div class="field"><label>Nome</label><input type="text" id="novaCatNome" placeholder="Ex: Viagens"></div>
+    <div class="field">
+      <label>Ícone</label>
+      <div class="chip-group">${CATEGORY_ICON_CHOICES.map(ic=>`<button type="button" class="chip ${ic===CATEGORY_ICON_CHOICES[0]?'selected':''}" onclick="chipSelect(this,'novaCatIcone','${ic}')">${ic}</button>`).join('')}</div>
+    </div>
+    <button class="btn btn-primary" onclick="salvarNovaCategoria()">Criar categoria</button>
+  `);
+  ui.novaCatIcone = CATEGORY_ICON_CHOICES[0];
+}
+function salvarNovaCategoria(){
+  const label = document.getElementById('novaCatNome').value.trim();
+  if(!label){ showToast('Dê um nome à categoria'); return; }
+  const key = slugifyCategoria(label);
+  state.categorias.push({ key, label, icon: ui.novaCatIcone||'🔖', fixa:false });
+  state.settings.orcamento[key] = 0;
+  saveState();
+  closeSheet();
+  showToast('Categoria criada ✓');
+  renderConfig();
+}
+function abrirEditarCategoria(catKey){
+  const c = (state.categorias||[]).find(x=>x.key===catKey);
+  if(!c) return;
+  openSheet(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><h3>Editar categoria</h3><button class="sheet-close" onclick="closeSheet()">✕</button></div>
+    <div class="field"><label>Nome</label><input type="text" id="editCatNome" value="${(c.label||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field">
+      <label>Ícone</label>
+      <div class="chip-group">${CATEGORY_ICON_CHOICES.map(ic=>`<button type="button" class="chip ${ic===c.icon?'selected':''}" onclick="chipSelect(this,'editCatIcone','${ic}')">${ic}</button>`).join('')}</div>
+    </div>
+    <button class="btn btn-primary" onclick="salvarEdicaoCategoria('${c.key}')">Salvar alterações</button>
+    ${!c.fixa ? `<button class="link-btn" style="margin-top:14px; color:var(--critical);" onclick="excluirCategoria('${c.key}')">Excluir categoria</button>` : ''}
+  `);
+  ui.editCatIcone = c.icon;
+}
+function salvarEdicaoCategoria(catKey){
+  const c = (state.categorias||[]).find(x=>x.key===catKey);
+  if(!c) return;
+  const label = document.getElementById('editCatNome').value.trim();
+  if(!label){ showToast('Dê um nome à categoria'); return; }
+  c.label = label;
+  c.icon = ui.editCatIcone || c.icon;
+  saveState();
+  closeSheet();
+  showToast('Categoria atualizada ✓');
+  renderConfig();
+}
+function excluirCategoria(catKey){
+  const c = (state.categorias||[]).find(x=>x.key===catKey);
+  if(!c || c.fixa) return;
+  const nLanc = state.lancamentos.filter(l=>l.categoria===catKey).length;
+  const aviso = nLanc>0
+    ? `Excluir "${c.label}"? Os ${nLanc} lançamento${nLanc===1?'':'s'} dessa categoria serão movidos para "Outros".`
+    : `Excluir a categoria "${c.label}"?`;
+  if(!confirm(aviso)) return;
+  state.categorias = state.categorias.filter(x=>x.key!==catKey);
+  state.lancamentos.forEach(l=>{ if(l.categoria===catKey) l.categoria='outros'; });
+  delete state.settings.orcamento[catKey];
+  if(ui.quickCategoria===catKey) ui.quickCategoria=null;
+  if(ui.relCategoria===catKey) ui.relCategoria='todos';
+  if(ui.simCategoria===catKey) ui.simCategoria=null;
+  saveState();
+  closeSheet();
+  showToast('Categoria excluída ✓');
+  renderConfig();
+}
+function atualizarOrcamento(cat, valor){ state.settings.orcamento[cat] = Number(valor)||0; saveState(); }
+function salvarContaCorrente(){
+  const saldoEl = document.getElementById('cfgSaldoInicial');
+  const dataEl = document.getElementById('cfgDataReferencia');
+  const saldo = parseMoneyInput(saldoEl.value ?? String(saldoEl.value));
+  state.settings.contaCorrente.saldoInicial = (saldo===null || isNaN(saldo)) ? (Number(saldoEl.value)||0) : saldo;
+  state.settings.contaCorrente.dataReferencia = dataEl.value || todayISO();
+  state.settings.contaCorrente.configurado = true;
+  saveState();
+  showToast('Saldo da conta salvo ✓');
+  renderConfig();
+}
+/* =========================================================
+   CARTÕES DE CRÉDITO — múltiplos, cada um com seu ciclo
+========================================================= */
+function adicionarCartao(){
+  state.cartoes.push({ id: uid(), nome: `Cartão ${state.cartoes.length+1}`, diaFechamento: 22, diaVencimento: 5 });
+  saveState();
+  renderConfig();
+}
+function atualizarCartao(cartaoId, campo, valor){
+  const c = state.cartoes.find(x=>x.id===cartaoId);
+  if(!c) return;
+  c[campo] = campo==='nome' ? (valor.trim()||c.nome) : (Number(valor)||1);
+  saveState();
+}
+function removerCartao(cartaoId){
+  if(state.cartoes.length<=1){ showToast('É preciso manter ao menos um cartão cadastrado'); return; }
+  const c = state.cartoes.find(x=>x.id===cartaoId);
+  if(!c) return;
+  const nLanc = state.lancamentos.filter(l=>l.formaTipo==='cartao' && l.cartaoId===cartaoId).length;
+  const aviso = nLanc>0
+    ? `Excluir "${c.nome}"? Os ${nLanc} lançamento${nLanc===1?'':'s'} desse cartão serão movidos para o primeiro cartão da lista.`
+    : `Excluir o cartão "${c.nome}"?`;
+  if(!confirm(aviso)) return;
+  state.cartoes = state.cartoes.filter(x=>x.id!==cartaoId);
+  const primeiro = state.cartoes[0];
+  state.lancamentos.forEach(l=>{ if(l.formaTipo==='cartao' && l.cartaoId===cartaoId) l.cartaoId = primeiro.id; });
+  saveState();
+  showToast('Cartão excluído ✓');
+  renderConfig();
+}
+function sugerirOrcamentoAutomatico(){
+  const pct = { casa:0.30, mercado:0.15, transporte:0.08, lazer:0.07, pedro:0.08, diva:0.03, saude:0.05, educacao:0.04, assinaturas:0.02, tiago:0.08, luciana:0.08, outros:0.02 };
+  const renda = rendaFixaTotalMes();
+  Object.keys(pct).forEach(k=>{ state.settings.orcamento[k] = Math.round(renda*pct[k]/10)*10; });
+  saveState(); showToast('Sugestão aplicada — ajuste como preferir'); renderConfig();
+}
+function mudarTema(t){
+  state.settings.theme = t;
+  document.documentElement.setAttribute('data-theme', t==='auto' ? '' : t);
+  saveState(); renderConfig();
+}
+function zerarDados(){
+  if(!confirm('Isso vai apagar TODOS os lançamentos e configurações deste aparelho. Tem certeza?')) return;
+  state = defaultState();
+  localStorage.removeItem(LS_KEY);
+  saveState();
+  showToast('Dados apagados');
+}
+function exportarBackup(){
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download = `orcamento-cabrera-${todayISO()}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  showToast('Backup exportado ✓');
+}
+function importarBackup(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const imported = JSON.parse(reader.result);
+      if(!imported.lancamentos) throw new Error('formato inválido');
+      const def = defaultState();
+      state = { ...def, ...imported, settings: { ...def.settings, ...(imported.settings||{}) } };
+      saveState();
+      showToast('Backup importado ✓');
+      renderConfig();
+    }catch(e){ showToast('Arquivo inválido'); }
+  };
+  reader.readAsText(f);
+}
+
+/* =========================================================
+   SINCRONIZAÇÃO (Firebase Firestore — opcional)
+========================================================= */
+async function connectFirebase(cfg){
+  await loadScriptOnce('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+  await loadScriptOnce('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js');
+  if(!fbApp){
+    fbApp = firebase.initializeApp({
+      apiKey: cfg.apiKey,
+      authDomain: cfg.authDomain || (cfg.projectId+'.firebaseapp.com'),
+      projectId: cfg.projectId,
+      appId: cfg.appId,
+    });
+  }
+  fbDb = firebase.firestore();
+  const docRef = fbDb.collection('familias').doc(cfg.familyCode);
+  if(fbUnsub) fbUnsub();
+  fbUnsub = docRef.onSnapshot(snap=>{
+    if(!snap.exists) return;
+    const remote = snap.data();
+    if(remote && remote.updatedAt && remote.updatedAt > state.updatedAt){
+      state = {
+        ...state,
+        lancamentos: remote.lancamentos || [],
+        potes: remote.potes || state.potes,
+        movimentosPoupanca: remote.movimentosPoupanca || state.movimentosPoupanca,
+        categorias: (remote.categorias && remote.categorias.length) ? remote.categorias : state.categorias,
+        cartoes: (remote.cartoes && remote.cartoes.length) ? remote.cartoes : state.cartoes,
+        settings: { ...state.settings, rendaFixa: remote.settings?.rendaFixa || state.settings.rendaFixa, orcamento: remote.settings?.orcamento || state.settings.orcamento, contaCorrente: remote.settings?.contaCorrente || state.settings.contaCorrente },
+        updatedAt: remote.updatedAt,
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      rebuildCategoriesFromState();
+      renderAll();
+      showToast('Dados atualizados de outro aparelho ✓');
+    }
+  }, err=>{ console.error(err); showToast('Erro de sincronização — verifique a configuração'); });
+  fbReady = true;
+  renderAll();
+}
+async function syncPush(){
+  if(!fbDb || !state.settings.firebase) return;
+  const cfg = state.settings.firebase;
+  const docRef = fbDb.collection('familias').doc(cfg.familyCode);
+  await docRef.set({
+    lancamentos: state.lancamentos,
+    potes: state.potes,
+    movimentosPoupanca: state.movimentosPoupanca,
+    categorias: state.categorias,
+    cartoes: state.cartoes,
+    settings: { rendaFixa: state.settings.rendaFixa, orcamento: state.settings.orcamento, contaCorrente: state.settings.contaCorrente },
+    updatedAt: state.updatedAt,
+  }, { merge: true });
+}
+async function salvarConfigSync(){
+  const apiKey = document.getElementById('fbApiKey').value.trim();
+  const projectId = document.getElementById('fbProjectId').value.trim();
+  const appId = document.getElementById('fbAppId').value.trim();
+  const familyCode = document.getElementById('fbFamilyCode').value.trim();
+  if(!apiKey||!projectId||!appId||!familyCode){ showToast('Preencha todos os campos de sincronização'); return; }
+  const cfg = { apiKey, projectId, appId, familyCode };
+  try{
+    await connectFirebase(cfg);
+    state.settings.firebase = cfg;
+    saveState({ skipSync:true });
+    await syncPush();
+    showToast('Sincronização ativada ✓');
+    renderConfig();
+  }catch(e){ console.error(e); showToast('Não consegui conectar — confira os dados do Firebase'); }
+}
+function desconectarSync(){
+  if(fbUnsub) fbUnsub();
+  fbUnsub = null; fbReady = false;
+  state.settings.firebase = null;
+  saveState({ skipSync:true });
+  showToast('Sincronização desativada neste aparelho');
+  renderConfig();
+}
+
+/* =========================================================
+   INIT
+========================================================= */
+(function init(){
+  if(state.settings.theme && state.settings.theme!=='auto'){
+    document.documentElement.setAttribute('data-theme', state.settings.theme);
+  }
+  if(state.settings.firebase){
+    connectFirebase(state.settings.firebase).catch(e=>console.error('auto-sync', e));
+  }
+  renderAll();
+})();
+
+</script>
+</body>
+</html>
