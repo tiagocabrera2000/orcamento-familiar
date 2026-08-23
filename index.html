@@ -1046,6 +1046,13 @@ function chipSelect(el, uiField, value){
   el.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));
   el.classList.add('selected');
 }
+/* Igual ao chipSelect, mas para controles .segmented (usa a classe .active em vez
+   de .selected em .chip) — usado na ficha de editar lançamento (ex: fixa/variável). */
+function editLancSegSelect(el, uiField, value){
+  ui[uiField] = value;
+  el.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
 function capturarCamposLancar(){
   const g = id=>document.getElementById(id);
   if(g('quickAmount')) ui.quickAmountStr = g('quickAmount').value;
@@ -2366,6 +2373,13 @@ function abrirDetalheLancamento(lancId){
     <div class="field">
       <label>Categoria</label>
       <div class="chip-group">${catOptions.map(c=>`<button type="button" class="chip ${c.key===l.categoria?'selected':''}" onclick="chipSelect(this,'editLancCategoria','${c.key}')">${c.icon} ${c.label}</button>`).join('')}</div>
+    </div>
+    <div class="field">
+      <label>Essa despesa é fixa ou variável?</label>
+      <div class="segmented">
+        <button type="button" class="${(l.natureza||'variavel')==='fixa'?'active':''}" onclick="editLancSegSelect(this,'editLancNatureza','fixa')">Fixa</button>
+        <button type="button" class="${(l.natureza||'variavel')==='variavel'?'active':''}" onclick="editLancSegSelect(this,'editLancNatureza','variavel')">Variável</button>
+      </div>
     </div>` : ''}
     <div class="field">
       <label>Quem</label>
@@ -2386,6 +2400,7 @@ function abrirDetalheLancamento(lancId){
   ui.editLancCategoria = l.categoria;
   ui.editLancQuem = l.quem;
   ui.editLancCartaoId = l.cartaoId || cartaoPadrao().id;
+  ui.editLancNatureza = l.natureza || 'variavel';
 }
 function salvarEdicaoLancamento(lancId){
   const l = state.lancamentos.find(x=>x.id===lancId);
@@ -2414,6 +2429,7 @@ function salvarEdicaoLancamento(lancId){
     if(item.tipo==='despesa'){
       item.categoria = ui.editLancCategoria || item.categoria;
       item.quem = ui.editLancQuem || item.quem;
+      item.natureza = ui.editLancNatureza || item.natureza || 'variavel';
       if(item.formaTipo==='cartao'){
         item.cartaoId = ui.editLancCartaoId || item.cartaoId || cartaoPadrao().id;
       }
