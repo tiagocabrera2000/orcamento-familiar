@@ -2013,20 +2013,24 @@ function ymRefLancamento(l, modo){
   if(modo==='hoje') return ymFromISO(l.tipo==='receita' ? l.data : (l.dataCaixa||l.data));
   return l.mesRef;
 }
-function gastoPorCategoriaPeriodo(de, ate, pessoa, categoriaFiltro, modo){
+function gastoPorCategoriaPeriodo(de, ate, pessoa, categoriaFiltro, modo, naturezaFiltro){
   modo = modo || 'mes';
+  naturezaFiltro = naturezaFiltro || 'todos';
   const out = {}; CATEGORIES.forEach(c=>out[c.key]=0);
   state.lancamentos.filter(l=> l.tipo==='despesa' && ymRefLancamento(l,modo)>=de && ymRefLancamento(l,modo)<=ate &&
-    (pessoa==='todos'||l.quem===pessoa) && (categoriaFiltro==='todos'||l.categoria===categoriaFiltro)
+    (pessoa==='todos'||l.quem===pessoa) && (categoriaFiltro==='todos'||l.categoria===categoriaFiltro) &&
+    (naturezaFiltro==='todos'||(l.natureza||'variavel')===naturezaFiltro)
   ).forEach(l=>{ out[l.categoria]=(out[l.categoria]||0)+Number(l.valor||0); });
   return out;
 }
 function transacoesFiltradas(){
   const modo = ui.relModo||'mes';
+  const naturezaFiltro = ui.relNatureza||'todos';
   return state.lancamentos.filter(l=>
     ymRefLancamento(l,modo)>=ui.relYmDe && ymRefLancamento(l,modo)<=ui.relYmAte &&
     (ui.relPessoa==='todos'||l.quem===ui.relPessoa) &&
-    (ui.relCategoria==='todos'||l.categoria===ui.relCategoria)
+    (ui.relCategoria==='todos'||l.categoria===ui.relCategoria) &&
+    (naturezaFiltro==='todos'||l.tipo!=='despesa'||(l.natureza||'variavel')===naturezaFiltro)
   ).sort((a,b)=> b.data.localeCompare(a.data) || b.criadoEm-a.criadoEm);
 }
 function evolucaoMensal(nMeses=6){
@@ -2048,6 +2052,61 @@ function evolucaoMensal(nMeses=6){
     backgroundColor: f.color, borderColor: colorVar('--surface-card'), borderWidth: 2, borderRadius: 4,
   }));
   return { meses, datasets, folded };
+}
+/* Fluxo receita x despesa x saldo (poupança/déficit) mês a mês, para o gráfico de
+   linha do relatório "Fluxo". Respeita os mesmos filtros de pessoa/categoria/
+   natureza da tela de Relatórios, e o modo Hoje (real) x Mês (orçado). No modo
+   'hoje', a renda fixa de cada mês só conta se já foi de fato recebida até hoje
+   (mesma lógica usada no restante da tela); no modo 'mes', conta o previsto
+   inteiro para cada mês do período. */
+function fluxoReceitaDespesaMensal(ymDe, ymAte, modo, pessoa, categoriaFiltro, naturezaFiltro){
+  modo = modo || 'mes';
+  pessoa = pessoa || 'todos';
+  categoriaFiltro = categoriaFiltro || 'todos';
+  naturezaFiltro = naturezaFiltro || 'todos';
+  const meses = []; let cursor = ymDe, guard=0;
+  while(cursor <= ymAte && guard < 600){ meses.push(cursor); cursor = ymAdd(cursor,1); guard++; }
+
+  const porMes = {};
+  meses.forEach(ym=>{ porMes[ym] = { receita:0, despesa:0 }; });
+
+  state.lancamentos.forEach(l=>{
+    const ym = ymRefLancamento(l, modo);
+    if(!porMes[ym]) return;
+    if(pessoa!=='todos' && l.quem!==pessoa) return;
+    if(l.tipo==='despesa'){
+      if(categoriaFiltro!=='todos' && l.categoria!==categoriaFiltro) return;
+      if(naturezaFiltro!=='todos' && (l.natureza||'variavel')!==naturezaFiltro) return;
+      porMes[ym].despesa += Number(l.valor||0);
+    } else {
+      if(categoriaFiltro!=='todos' && categoriaFiltro!=='variavel') return; // receita variável não tem outras categorias
+      porMes[ym].receita += Number(l.valor||0);
+    }
+  });
+
+  // Renda fixa prevista/recebida entra à parte (não é um "lançamento" na lista).
+  meses.forEach(ym=>{
+    if(pessoa!=='todos') return; // renda fixa é da família, não teria pessoa própria pra filtrar
+    if(categoriaFiltro!=='todos' && categoriaFiltro!=='variavel') return;
+    if(modo==='hoje'){
+      const hojeYm = ymKey(new Date());
+      if(ym>hojeYm) return;
+      const deISO = inicioDoMesISO(ym);
+      const ateISO = (ym===hojeYm) ? todayISO() : fimDoMesISO(ym);
+      porMes[ym].receita += somaRendaFixaEntrePeriodo(deISO, ateISO);
+    } else {
+      porMes[ym].receita += rendaFixaTotalMes();
+    }
+  });
+
+  const labels = meses.map(ym=>ymLabel(ym).replace(' de ',"/").slice(0,7));
+  const receitas = meses.map(ym=>porMes[ym].receita);
+  const despesas = meses.map(ym=>porMes[ym].despesa);
+  const saldos = meses.map((ym,i)=>receitas[i]-despesas[i]);
+  const totalReceitas = receitas.reduce((s,v)=>s+v,0);
+  const totalDespesas = despesas.reduce((s,v)=>s+v,0);
+  const totalSaldo = totalReceitas-totalDespesas;
+  return { meses, labels, receitas, despesas, saldos, totalReceitas, totalDespesas, totalSaldo };
 }
 
 if(!ui.relYmDe){ ui.relYmDe = ymKey(new Date()); ui.relYmAte = ymKey(new Date()); ui.relPreset='Este mês'; ui.relShowTable=false; }
@@ -2073,6 +2132,7 @@ function renderRelatorios(){
   const somaCat = catEntries.reduce((s,e)=>s+e.value,0) || 1;
 
   const evo = evolucaoMensal(6);
+  const fluxo = ui.relView==='fluxo' ? fluxoReceitaDespesaMensal(ui.relYmDe, ui.relYmAte, modo, ui.relPessoa, ui.relCategoria, ui.relNatureza) : null;
 
   const html = `
     <div class="card">
@@ -2100,12 +2160,21 @@ function renderRelatorios(){
         ${PEOPLE.map(p=>`<button class="filter-pill ${ui.relPessoa===p.key?'active':''}" onclick="ui.relPessoa='${p.key}';renderRelatorios()">${p.icon} ${p.label}</button>`).join('')}
       </div>
       <div class="filter-bar">
-        <button class="filter-pill ${ui.relCategoria==='todos'?'active':''}" onclick="ui.relCategoria='todos';renderRelatorios()">Todas categorias</button>
-        ${CATEGORIES.filter(c=>c.key!=='variavel').map(c=>`<button class="filter-pill ${ui.relCategoria===c.key?'active':''}" onclick="ui.relCategoria='${c.key}';renderRelatorios()">${c.icon} ${c.label}</button>`).join('')}
+        <button class="filter-pill ${(ui.relNatureza||'todos')==='todos'?'active':''}" onclick="ui.relNatureza='todos';renderRelatorios()">Fixa e variável</button>
+        <button class="filter-pill ${ui.relNatureza==='fixa'?'active':''}" onclick="ui.relNatureza='fixa';renderRelatorios()">Só fixas</button>
+        <button class="filter-pill ${ui.relNatureza==='variavel'?'active':''}" onclick="ui.relNatureza='variavel';renderRelatorios()">Só variáveis</button>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>Categoria</label>
+        <select onchange="ui.relCategoria=this.value;renderRelatorios()">
+          <option value="todos" ${ui.relCategoria==='todos'?'selected':''}>Todas categorias</option>
+          ${CATEGORIES.filter(c=>c.key!=='variavel').map(c=>`<option value="${c.key}" ${ui.relCategoria===c.key?'selected':''}>${c.icon} ${c.label}</option>`).join('')}
+        </select>
       </div>
       <div class="segmented" style="margin-top:14px;">
         <button class="${ui.relView==='sintetico'?'active':''}" onclick="ui.relView='sintetico';renderRelatorios()">Sintético</button>
         <button class="${ui.relView==='detalhado'?'active':''}" onclick="ui.relView='detalhado';renderRelatorios()">Detalhado</button>
+        <button class="${ui.relView==='fluxo'?'active':''}" onclick="ui.relView='fluxo';renderRelatorios()">Receita × Despesa</button>
         <button class="${ui.relView==='extrato'?'active':''}" onclick="ui.relView='extrato';renderRelatorios()">Extrato da conta</button>
       </div>
     </div>
@@ -2146,6 +2215,30 @@ function renderRelatorios(){
       ${filtradas.length===0 ? `<div class="empty-state"><div class="ic">📭</div>Nenhum lançamento encontrado.</div>` :
       filtradas.map(l=>renderTxnItem(l)).join('')}
     </div>
+    ` : ui.relView==='fluxo' ? `
+    <div class="card">
+      <h2>Receita × Despesa <span class="hint">· ${fluxo.meses.length} mês(es) no período</span></h2>
+      ${fluxo.meses.length===0 ? `<div class="empty-state"><div class="ic">📭</div>Selecione um período válido.</div>` : `
+      <canvas id="chartFluxo" height="240"></canvas>
+      <div class="legend" style="margin-top:10px;">
+        <div class="legend-item"><span class="legend-swatch" style="background:${colorVar('--good')}"></span>Receita</div>
+        <div class="legend-item"><span class="legend-swatch" style="background:${colorVar('--critical')}"></span>Despesa</div>
+        <div class="legend-item"><span class="legend-swatch" style="background:${colorVar('--text-primary')}"></span>Saldo (poupança/déficit)</div>
+      </div>
+      <div class="stat-grid" style="margin-top:14px;">
+        <div class="stat-tile"><div class="stat-label">Receita total</div><div class="stat-value good">${fmtMoneyCompact(fluxo.totalReceitas)}</div></div>
+        <div class="stat-tile"><div class="stat-label">Despesa total</div><div class="stat-value crit">${fmtMoneyCompact(fluxo.totalDespesas)}</div></div>
+      </div>
+      <div class="stat-grid" style="margin-top:10px;">
+        <div class="stat-tile" style="grid-column: 1 / -1;"><div class="stat-label">${fluxo.totalSaldo>=0?'Saving no período':'Déficit no período'}</div><div class="stat-value ${fluxo.totalSaldo>=0?'good':'crit'}">${fluxo.totalSaldo>=0?'+':'−'}${fmtMoneyCompact(Math.abs(fluxo.totalSaldo))}</div></div>
+      </div>
+      <button class="link-btn" style="margin-top:12px;" onclick="ui.relShowTableFluxo=!ui.relShowTableFluxo;renderRelatorios()">${ui.relShowTableFluxo?'Ocultar tabela':'Ver como tabela'}</button>
+      ${ui.relShowTableFluxo ? `
+      <table class="table-view"><thead><tr><th>Mês</th><th>Receita</th><th>Despesa</th><th>Saldo</th></tr></thead><tbody>
+        ${fluxo.meses.map((ym,i)=>`<tr><td>${fluxo.labels[i]}</td><td class="num">${fmtMoney(fluxo.receitas[i])}</td><td class="num">${fmtMoney(fluxo.despesas[i])}</td><td class="num" style="color:${fluxo.saldos[i]<0?colorVar('--critical'):colorVar('--good')}">${fmtMoney(fluxo.saldos[i])}</td></tr>`).join('')}
+      </tbody></table>` : ''}
+      `}
+    </div>
     ` : renderExtratoContaHtml()}
   `;
   document.getElementById('view-relatorios').innerHTML = html;
@@ -2164,6 +2257,23 @@ function renderRelatorios(){
       options: {
         plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(ctx)=> ` ${ctx.dataset.label}: ${fmtMoney(ctx.parsed.y)}` } } },
         scales: { x: { stacked:true, grid:{display:false}, ticks:{color: colorVar('--text-muted')} }, y: { stacked:true, grid:{color: colorVar('--gridline')}, ticks:{color: colorVar('--text-muted'), callback:(v)=>fmtMoneyCompact(v)} } }
+      }
+    });
+  }
+  if(ui.relView==='fluxo' && fluxo && fluxo.meses.length>0){
+    makeChart('chartFluxo', {
+      type:'line',
+      data: {
+        labels: fluxo.labels,
+        datasets: [
+          { label:'Receita', data: fluxo.receitas, borderColor: colorVar('--good'), backgroundColor: colorVar('--good'), tension:0.3, pointRadius:3 },
+          { label:'Despesa', data: fluxo.despesas, borderColor: colorVar('--critical'), backgroundColor: colorVar('--critical'), tension:0.3, pointRadius:3 },
+          { label:'Saldo', data: fluxo.saldos, borderColor: colorVar('--text-primary'), backgroundColor: colorVar('--text-primary'), borderDash:[5,4], tension:0.3, pointRadius:3 },
+        ]
+      },
+      options: {
+        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(ctx)=> ` ${ctx.dataset.label}: ${fmtMoney(ctx.parsed.y)}` } } },
+        scales: { x: { grid:{display:false}, ticks:{color: colorVar('--text-muted')} }, y: { grid:{color: colorVar('--gridline')}, ticks:{color: colorVar('--text-muted'), callback:(v)=>fmtMoneyCompact(v)} } }
       }
     });
   }
