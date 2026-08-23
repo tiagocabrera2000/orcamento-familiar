@@ -167,6 +167,14 @@
   .cat-row .track .fill { height: 100%; border-radius: 999px; }
   .cat-row .over-note { font-size: 11px; color: var(--critical); }
 
+  .extrato-dia { margin-bottom: 16px; }
+  .extrato-dia:last-child { margin-bottom: 0; }
+  .extrato-dia-header { display:flex; justify-content: space-between; align-items: baseline; font-size: 13px; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--gridline); }
+  .extrato-dia-header b { color: var(--text-primary); }
+  .extrato-item { display:flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 5px 0; color: var(--text-secondary); }
+  .extrato-item .good { color: var(--good-text); font-weight:600; font-variant-numeric: tabular-nums; }
+  .extrato-item .crit { color: var(--critical); font-weight:600; font-variant-numeric: tabular-nums; }
+
   .insight { display:flex; gap:10px; padding: 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); font-size: 13px; line-height:1.45; margin-top:8px;}
   .insight .icon { font-size: 15px; flex-shrink:0; }
   .insight.warn { border-color: color-mix(in srgb, var(--warning) 40%, var(--border)); }
@@ -452,7 +460,8 @@ const LS_KEY = 'orcamentoCabreraState_v1';
 ========================================================= */
 function defaultState(){
   return {
-    // {id,tipo,valor,descricao,categoria,quem,forma,formaTipo,data,dataCaixa,mesRef,parcela,origem,anexoNome,anexoData,criadoEm}
+    // {id,tipo,valor,descricao,categoria,quem,forma,formaTipo,data,dataCaixa,mesRef,parcela,origem,anexoNome,anexoData,criadoEm,
+    //  natureza:'fixa'|'variavel', recorrencia:'pontual'|'indeterminada'|'periodo', recorrenciaGrupo, recorrenciaFim}
     lancamentos: [],
     potes: [], // {id,nome,icone,taxaMensalPct,saldoBase,dataBase}
     movimentosPoupanca: [], // {id,poteId,tipo:'aporte'|'resgate',valor,data,origem,criadoEm}
@@ -643,6 +652,74 @@ function calcularDataCaixa(formaTipo, dataCompraISO, parcelaIndex, vencimentoBol
   if(tipo.timing==='vencimento') return vencimentoBoletoISO || dataCompraISO;
   return calcularVencimentoFatura(dataCompraISO, parcelaIndex||0, cartaoId);
 }
+/* Mês do orçamento automático, a partir da data do lançamento e da forma de pagamento:
+   - Pix/Débito/Dinheiro/Transferência → mês da própria data do lançamento.
+   - Boleto → mês da data de vencimento informada.
+   - Cartão de crédito → mês em que a fatura desse cartão vai fechar (considera o dia de
+     fechamento do cartão específico usado; parcelaIndex desloca para parcelas futuras). */
+function calcularMesRefAutomatico(formaTipo, dataLancamentoISO, parcelaIndex, vencimentoBoletoISO, cartaoId){
+  const tipo = PAYMENT_TYPE_MAP[formaTipo] || PAYMENT_TYPE_MAP.cartao;
+  if(tipo.timing==='imediato') return ymFromISO(dataLancamentoISO);
+  if(tipo.timing==='vencimento') return ymFromISO(vencimentoBoletoISO || dataLancamentoISO);
+  return ymFromISO(calcularVencimentoFatura(dataLancamentoISO, parcelaIndex||0, cartaoId));
+}
+
+/* =========================================================
+   RECORRÊNCIA — despesas que se repetem automaticamente todo mês
+   (ex: Netflix, condomínio), independente de serem "fixas" ou não.
+   'indeterminada': sempre mantém HORIZONTE_RECORRENCIA_MESES lançamentos
+   futuros gerados a partir de hoje; completa o horizonte cada vez que o
+   app carrega. 'periodo': gera só dentro do intervalo [inicio, fim]
+   escolhido pelo usuário, sem completar depois. */
+const HORIZONTE_RECORRENCIA_MESES = 12;
+/* Soma `deltaMeses` meses a uma data ISO (dia-do-mês preservado, saturando no
+   último dia do mês de destino quando o dia original não existir nele). */
+function addMesesISO(dataISO, deltaMeses){
+  const dia = Number(dataISO.slice(8,10));
+  const novoYm = ymAdd(ymFromISO(dataISO), deltaMeses);
+  const diaFinal = Math.min(dia, daysInMonth(novoYm));
+  return novoYm+'-'+String(diaFinal).padStart(2,'0');
+}
+/* Gera (e insere em state.lancamentos) as ocorrências futuras que ainda faltam
+   para um lançamento-semente recorrente, sem duplicar as que já existem.
+   Chamada tanto ao criar a recorrência quanto no boot do app (para completar
+   o horizonte de recorrências indeterminadas conforme o tempo passa). */
+function gerarOcorrenciasRecorrencia(semente){
+  if(!semente.recorrenciaGrupo) return 0;
+  const existentes = state.lancamentos.filter(l=>l.recorrenciaGrupo===semente.recorrenciaGrupo);
+  const maxIndiceExistente = existentes.reduce((mx,l)=>Math.max(mx, l.recorrenciaIndice||0), 0);
+  const limiteIndice = semente.recorrencia==='indeterminada'
+    ? (HORIZONTE_RECORRENCIA_MESES - 1)
+    : Math.max(0, monthsBetween(ymFromISO(semente.data), ymFromISO(semente.recorrenciaFim)) - 1);
+  let criados = 0;
+  for(let i=maxIndiceExistente+1; i<=limiteIndice; i++){
+    const dataOcorrencia = addMesesISO(semente.data, i);
+    if(semente.recorrencia==='periodo' && dataOcorrencia > semente.recorrenciaFim) break;
+    const boletoVenc = semente.formaTipo==='boleto' ? addMesesISO(semente.dataCaixa||semente.data, i) : null;
+    state.lancamentos.push({
+      ...semente,
+      id: uid(),
+      data: dataOcorrencia,
+      dataCaixa: calcularDataCaixa(semente.formaTipo, dataOcorrencia, 0, boletoVenc, semente.cartaoId),
+      mesRef: calcularMesRefAutomatico(semente.formaTipo, dataOcorrencia, 0, boletoVenc, semente.cartaoId),
+      recorrenciaIndice: i,
+      parcela: null, parcelaGrupo: null,
+      criadoEm: Date.now(),
+    });
+    criados++;
+  }
+  return criados;
+}
+/* Roda no boot e depois de qualquer edição: para cada recorrência indeterminada
+   ainda "viva" (a semente não foi excluída), garante que o horizonte de 12 meses
+   está completo. Recorrências por período não precisam disso — já foram geradas
+   por inteiro na criação. */
+function completarHorizonteRecorrencias(){
+  const sementes = state.lancamentos.filter(l=>l.recorrencia==='indeterminada' && l.recorrenciaIndice===0);
+  let algumCriado = false;
+  sementes.forEach(s=>{ if(gerarOcorrenciasRecorrencia(s)>0) algumCriado = true; });
+  return algumCriado;
+}
 
 /* =========================================================
    SALDO EM CONTA CORRENTE (caixa real, separado do orçamentário)
@@ -717,6 +794,68 @@ function resumoCaixaHoje(){
     .sort((a,b)=> (b.dataCaixa||b.data).localeCompare(a.dataCaixa||a.data))
     .slice(0,8);
   return { deISO, hojeISO, saldoInicial, receitasFixasRecebidas, receitasVariaveisRecebidas, despesasDebitadas, poupancaLiquida, saldoHoje, movimentosRecentes, configurado: !!cfg.configurado };
+}
+
+/* Extrato dia a dia da conta corrente num período [deISO, ateISO]: uma linha por
+   movimento real (entradas de renda fixa/variável, despesas na data em que
+   efetivamente batem na conta via dataCaixa, e aportes/resgates de poupança),
+   agrupado por dia, com o saldo da conta acumulado ao final de cada dia. */
+function extratoContaCorrente(deISOPedido, ateISO){
+  const cfg = state.settings.contaCorrente || { saldoInicial:0, dataReferencia: todayISO(), configurado:false };
+  const refISO = cfg.dataReferencia;
+  // O saldo inicial só é confiável a partir da data de referência configurada em
+  // Ajustes — tudo antes dela já está embutido nesse número, então o extrato nunca
+  // deve listar (nem contar de novo) movimentos anteriores a ela. Se o período
+  // pedido começa antes da data de referência, o extrato efetivamente começa nela.
+  const deISO = deISOPedido > refISO ? deISOPedido : refISO;
+  // saldo acumulado até o dia anterior ao início efetivo do período, para servir de base
+  const diaAnteriorISO = isoFromDate(new Date(new Date(deISO+'T12:00:00').getTime()-86400000));
+  const saldoBaseAntesPeriodo = deISO > refISO ? saldoContaCorrente(diaAnteriorISO) : Number(cfg.saldoInicial||0);
+  const movimentos = [];
+  if(ateISO >= deISO){
+    // renda fixa: uma ocorrência por dia de pagamento dentro do período
+    let cursorYm = ymFromISO(deISO), guard = 0;
+    const ateYm = ymFromISO(ateISO);
+    while(cursorYm <= ateYm && guard < 600){
+      (state.settings.rendaFixa||[]).forEach(r=>{
+        const dia = Math.min(Number(r.dia)||1, daysInMonth(cursorYm));
+        const iso = cursorYm+'-'+String(dia).padStart(2,'0');
+        if(iso>=deISO && iso<=ateISO) movimentos.push({ data: iso, desc: r.desc||'Renda fixa', valor: Number(r.valor||0), tipo:'entrada' });
+      });
+      cursorYm = ymAdd(cursorYm, 1); guard++;
+    }
+    state.lancamentos.forEach(l=>{
+      if(l.tipo==='receita'){
+        if(l.data>=deISO && l.data<=ateISO) movimentos.push({ data:l.data, desc:l.descricao, valor:Number(l.valor||0), tipo:'entrada' });
+      } else {
+        const dc = l.dataCaixa||l.data;
+        if(dc>=deISO && dc<=ateISO) movimentos.push({ data:dc, desc:l.descricao, valor:Number(l.valor||0), tipo:'saida' });
+      }
+    });
+    (state.movimentosPoupanca||[]).forEach(m=>{
+      if(m.data>=deISO && m.data<=ateISO){
+        const pote = (state.potes||[]).find(p=>p.id===m.poteId);
+        const nomePote = pote ? pote.nome : 'poupança';
+        if(m.tipo==='aporte') movimentos.push({ data:m.data, desc:`Investimento em ${nomePote}`, valor:Number(m.valor||0), tipo:'saida' });
+        if(m.tipo==='resgate') movimentos.push({ data:m.data, desc:`Resgate de ${nomePote}`, valor:Number(m.valor||0), tipo:'entrada' });
+      }
+    });
+  }
+  movimentos.sort((a,b)=> a.data.localeCompare(b.data));
+  // agrupa por dia, calculando o saldo acumulado ao final de cada dia
+  const porDia = {};
+  movimentos.forEach(m=>{ (porDia[m.data] = porDia[m.data]||[]).push(m); });
+  let saldoCorrente = saldoBaseAntesPeriodo;
+  const dias = Object.keys(porDia).sort().map(data=>{
+    const itens = porDia[data];
+    const totalDia = itens.reduce((s,m)=> s + (m.tipo==='entrada'? m.valor : -m.valor), 0);
+    saldoCorrente += totalDia;
+    return { data, itens, totalDia, saldoApos: saldoCorrente };
+  });
+  const totalEntradas = movimentos.filter(m=>m.tipo==='entrada').reduce((s,m)=>s+m.valor,0);
+  const totalSaidas = movimentos.filter(m=>m.tipo==='saida').reduce((s,m)=>s+m.valor,0);
+  const saldoFinal = saldoBaseAntesPeriodo + totalEntradas - totalSaidas;
+  return { deISO, ateISO, saldoBaseAntesPeriodo, dias, totalEntradas, totalSaidas, saldoFinal, configurado: !!cfg.configurado };
 }
 
 /* =========================================================
@@ -854,6 +993,11 @@ const ui = {
   quickAnexo: null,
   quickBoletoVenc: '',
   quickCartaoId: null,
+  quickNatureza: 'variavel', // 'fixa' | 'variavel' — só etiqueta, sem efeito automático
+  quickRecorrencia: 'pontual', // 'pontual' | 'indeterminada' | 'periodo'
+  quickRecorrenciaFim: '',
+  quickParceladoAvista: 'avista', // 'avista' | 'parcelado' — só p/ cartão
+  quickMesRefManual: false, // true depois que o usuário editar o mês do orçamento na mão
   simCategoria: null,
   simQuem: 'tiago',
   simFormaTipo: 'cartao',
@@ -893,17 +1037,41 @@ function capturarCamposLancar(){
   if(g('quickAmount')) ui.quickAmountStr = g('quickAmount').value;
   if(g('quickDesc')) ui.quickDescStr = g('quickDesc').value;
   if(g('quickData')) ui.quickDataStr = g('quickData').value;
-  if(g('quickMesRef')) ui.quickMesRefStr = g('quickMesRef').value;
+  if(g('quickMesRef') && ui.quickMesRefManual) ui.quickMesRefStr = g('quickMesRef').value+'-01';
   if(g('quickBoletoVenc')) ui.quickBoletoVenc = g('quickBoletoVenc').value;
+  if(g('quickParcelasN')) ui.quickParcelasN = parseInt(g('quickParcelasN').value)||2;
+  if(g('quickRecorrenciaFim')) ui.quickRecorrenciaFim = g('quickRecorrenciaFim').value;
 }
 function trocarTipoLancamento(tipo){ capturarCamposLancar(); ui.quickTipo = tipo; renderLancar(); }
 function selecionarFormaPagamento(tipo){
   capturarCamposLancar();
   ui.quickFormaTipo = tipo;
-  if(tipo!=='cartao') ui.quickParceladoOn = false;
+  if(tipo!=='cartao'){ ui.quickParceladoOn = false; ui.quickParceladoAvista = 'avista'; }
   renderLancar();
 }
-function toggleParcelado(){ capturarCamposLancar(); ui.quickParceladoOn = document.getElementById('quickParcelado').checked; renderLancar(); }
+/* Texto de apoio mostrando como a divisão das parcelas vai ficar: valor total ÷ N,
+   arredondado a 2 casas, com o resíduo de centavos absorvido na última parcela
+   para que a soma feche exatamente o valor total digitado. */
+function parcelasPreviewTexto(valorTotal, n){
+  if(!valorTotal || valorTotal<=0 || !n || n<2) return '';
+  const partes = dividirEmParcelas(valorTotal, n);
+  return `${n}x de ${fmtMoney(partes[0])}${partes[n-1]!==partes[0] ? ' (última de '+fmtMoney(partes[n-1])+')' : ''} — total ${fmtMoney(valorTotal)}`;
+}
+function dividirEmParcelas(valorTotal, n){
+  const centavosTotal = Math.round(valorTotal*100);
+  const base = Math.floor(centavosTotal/n);
+  const resto = centavosTotal - base*n;
+  const partes = new Array(n).fill(base);
+  partes[n-1] += resto; // absorve o resíduo de centavos na última parcela
+  return partes.map(c=>c/100);
+}
+function renderLancarParcelasPreview(){
+  ui.quickAmountStr = document.getElementById('quickAmount').value;
+  const n = parseInt(document.getElementById('quickParcelasN')?.value)||2;
+  ui.quickParcelasN = n;
+  const el = document.getElementById('quickParcelasPreview');
+  if(el) el.textContent = parcelasPreviewTexto(parseMoneyInput(ui.quickAmountStr)||0, n);
+}
 function toggleSimParcelado(){ capturarCamposSimuladorFull(); ui.simParceladoOn = document.getElementById('simParcelado').checked; renderSimulador(); }
 
 /* =========================================================
@@ -1081,6 +1249,13 @@ function openQuickAdd(){ showView('lancar'); setTimeout(()=>document.getElementB
 
 function renderLancar(){
   const cats = CATEGORIES.filter(c=>c.key!=='variavel');
+  const dataAtual = ui.quickDataStr || todayISO();
+  const boletoVencAtual = ui.quickBoletoVenc || todayISO();
+  const cartaoIdAtual = ui.quickCartaoId || cartaoPadrao().id;
+  const mesRefAuto = ui.quickTipo==='despesa'
+    ? calcularMesRefAutomatico(ui.quickFormaTipo, dataAtual, 0, boletoVencAtual, cartaoIdAtual)
+    : ymFromISO(dataAtual);
+  const mesRefExibido = ui.quickMesRefManual && ui.quickMesRefStr ? ui.quickMesRefStr : mesRefAuto+'-01';
   const html = `
     <div class="card">
       <h2>Novo lançamento</h2>
@@ -1093,14 +1268,6 @@ function renderLancar(){
         <span class="mic-pulse"></span> 🎙️ <span id="micBtnLabel">Falar lançamento</span>
       </button>
       <div class="voice-transcript" id="voiceTranscript"></div>
-
-      <div class="field">
-        <label>Valor</label>
-        <div class="amount-wrap">
-          <span class="prefix">R$</span>
-          <input class="amount-input" type="text" inputmode="decimal" id="quickAmount" placeholder="0,00" value="${ui.quickAmountStr||''}">
-        </div>
-      </div>
 
       <div class="field">
         <label>Descrição</label>
@@ -1121,46 +1288,95 @@ function renderLancar(){
         </div>
       </div>
       <div class="field">
+        <label>Essa despesa é fixa ou variável? <span class="hint" title="Fixa = você sempre tem esse gasto todo mês, mesmo que o valor mude (ex: luz). Variável = não é uma despesa habitual. É só uma etiqueta, não muda nada automaticamente.">ⓘ</span></label>
+        <div class="segmented">
+          <button class="${ui.quickNatureza==='fixa'?'active':''}" onclick="capturarCamposLancar();ui.quickNatureza='fixa';renderLancar()">Fixa</button>
+          <button class="${ui.quickNatureza==='variavel'?'active':''}" onclick="capturarCamposLancar();ui.quickNatureza='variavel';renderLancar()">Variável</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Pontual ou recorrente? <span class="hint" title="Recorrente gera automaticamente o mesmo lançamento nos próximos meses (ex: Netflix, condomínio) — independente de ser fixa ou variável.">ⓘ</span></label>
+        <div class="segmented">
+          <button class="${ui.quickRecorrencia==='pontual'?'active':''}" onclick="capturarCamposLancar();ui.quickRecorrencia='pontual';renderLancar()">Pontual</button>
+          <button class="${ui.quickRecorrencia!=='pontual'?'active':''}" onclick="capturarCamposLancar();ui.quickRecorrencia='indeterminada';renderLancar()">Recorrente</button>
+        </div>
+      </div>
+      ${ui.quickRecorrencia!=='pontual' ? `
+      <div class="field">
+        <label>Por quanto tempo se repete?</label>
+        <div class="segmented">
+          <button class="${ui.quickRecorrencia==='indeterminada'?'active':''}" onclick="capturarCamposLancar();ui.quickRecorrencia='indeterminada';renderLancar()">Tempo indeterminado</button>
+          <button class="${ui.quickRecorrencia==='periodo'?'active':''}" onclick="capturarCamposLancar();ui.quickRecorrencia='periodo';renderLancar()">Por um período</button>
+        </div>
+        ${ui.quickRecorrencia==='periodo' ? `
+        <div class="field" style="margin-top:10px;">
+          <label>Repetir até (mês/ano)</label>
+          <input type="month" id="quickRecorrenciaFim" value="${ui.quickRecorrenciaFim||ymAdd(ymKey(new Date()),6)}">
+        </div>
+        ` : `<div class="hint" style="margin-top:6px;">Vamos manter sempre os próximos 12 meses gerados automaticamente, até você excluir a recorrência.</div>`}
+      </div>
+      ` : ''}
+      <div class="field">
         <label>Forma de pagamento</label>
         <div class="chip-group">
           ${PAYMENT_TYPES.map(p=>`<button type="button" class="chip ${ui.quickFormaTipo===p.key?'selected':''}" onclick="selecionarFormaPagamento('${p.key}')">${p.icon} ${p.label}</button>`).join('')}
         </div>
       </div>
-      <div class="row2">
-        <div class="field">
-          <label>Data da compra</label>
-          <input type="date" id="quickData" value="${ui.quickDataStr||todayISO()}">
-        </div>
-        <div class="field">
-          <label>Mês do orçamento <span class="hint" title="Use para faturas fechadas em outro mês">ⓘ</span></label>
-          <input type="date" id="quickMesRef" value="${ui.quickMesRefStr||todayISO()}">
-        </div>
-      </div>
-      ${ui.quickFormaTipo==='boleto' ? `
-      <div class="field">
-        <label>Data de vencimento do boleto</label>
-        <input type="date" id="quickBoletoVenc" value="${ui.quickBoletoVenc||todayISO()}">
-        <div class="hint">O valor só sai da sua conta corrente nessa data — mas já entra no orçamento do mês agora.</div>
-      </div>
-      ` : ''}
       ${ui.quickFormaTipo==='cartao' ? `
       ${state.cartoes.length>1 ? `
       <div class="field">
         <label>Qual cartão</label>
-        <div class="chip-group">${state.cartoes.map(c=>`<button type="button" class="chip ${(ui.quickCartaoId||cartaoPadrao().id)===c.id?'selected':''}" onclick="chipSelect(this,'quickCartaoId','${c.id}')">💳 ${c.nome}</button>`).join('')}</div>
+        <div class="chip-group">${state.cartoes.map(c=>`<button type="button" class="chip ${cartaoIdAtual===c.id?'selected':''}" onclick="capturarCamposLancar();chipSelect(this,'quickCartaoId','${c.id}');renderLancar()">💳 ${c.nome}</button>`).join('')}</div>
       </div>
       ` : ''}
       <div class="field">
-        <label><input type="checkbox" id="quickParcelado" onchange="toggleParcelado()" ${ui.quickParceladoOn?'checked':''}> Compra parcelada</label>
+        <label>Valor total</label>
+        <div class="amount-wrap">
+          <span class="prefix">R$</span>
+          <input class="amount-input" type="text" inputmode="decimal" id="quickAmount" placeholder="0,00" value="${ui.quickAmountStr||''}" oninput="renderLancarParcelasPreview()">
+        </div>
       </div>
-      ${ui.quickParceladoOn ? `
-      <div class="row2">
-        <div class="field"><label>Nº de parcelas</label><input type="number" id="quickParcelasN" min="2" max="48" value="${ui.quickParcelasN||2}"></div>
-        <div class="field"><label>Valor por parcela</label><input type="text" id="quickParcelaValor" inputmode="decimal" placeholder="0,00"></div>
+      <div class="field">
+        <label>À vista ou parcelado?</label>
+        <div class="segmented">
+          <button class="${ui.quickParceladoAvista==='avista'?'active':''}" onclick="capturarCamposLancar();ui.quickParceladoAvista='avista';ui.quickParceladoOn=false;renderLancar()">À vista</button>
+          <button class="${ui.quickParceladoAvista==='parcelado'?'active':''}" onclick="capturarCamposLancar();ui.quickParceladoAvista='parcelado';ui.quickParceladoOn=true;renderLancar()">Parcelado</button>
+        </div>
       </div>
+      ${ui.quickParceladoAvista==='parcelado' ? `
+      <div class="field">
+        <label>Nº de parcelas</label>
+        <input type="number" id="quickParcelasN" min="2" max="48" value="${ui.quickParcelasN||2}" oninput="renderLancarParcelasPreview()">
+      </div>
+      <div class="hint" id="quickParcelasPreview" style="margin-top:-6px;">${parcelasPreviewTexto(parseMoneyInput(ui.quickAmountStr)||0, ui.quickParcelasN||2)}</div>
       ` : ''}
-      <div class="field hint" style="margin-top:-8px;">${ui.quickParceladoOn ? 'Cada parcela cai na fatura do mês correspondente, conforme o ciclo configurado em Ajustes.' : 'Vai cair na próxima fatura que fechar, conforme o ciclo configurado em Ajustes.'}</div>
-      ` : ''}
+      <div class="field hint" style="margin-top:-4px;">${ui.quickParceladoAvista==='parcelado' ? 'Cada parcela cai na fatura do mês correspondente, conforme o ciclo configurado em Ajustes.' : 'Vai cair na próxima fatura que fechar, conforme o ciclo configurado em Ajustes.'}</div>
+      ` : `
+      <div class="field">
+        <label>Valor${ui.quickFormaTipo==='boleto'?' total':''}</label>
+        <div class="amount-wrap">
+          <span class="prefix">R$</span>
+          <input class="amount-input" type="text" inputmode="decimal" id="quickAmount" placeholder="0,00" value="${ui.quickAmountStr||''}">
+        </div>
+      </div>
+      `}
+      ${ui.quickFormaTipo==='boleto' ? `
+      <div class="field">
+        <label>Data de vencimento</label>
+        <input type="date" id="quickBoletoVenc" value="${boletoVencAtual}" onchange="ui.quickBoletoVenc=this.value;renderLancar()">
+        <div class="hint">O valor só sai da sua conta corrente nessa data. O mês do orçamento é automático: o vencimento define o mês.</div>
+      </div>
+      ` : `
+      <div class="field">
+        <label>Data do lançamento</label>
+        <input type="date" id="quickData" value="${dataAtual}" onchange="ui.quickDataStr=this.value;renderLancar()">
+      </div>
+      `}
+      <div class="field">
+        <label>Mês do orçamento <span class="hint" title="Preenchido automaticamente pela data do lançamento (e, no cartão, pelo fechamento da fatura). Edite só se precisar forçar outro mês.">ⓘ</span></label>
+        <input type="month" id="quickMesRef" value="${mesRefExibido.slice(0,7)}" onchange="ui.quickMesRefManual=true;ui.quickMesRefStr=this.value+'-01';renderLancar()">
+        ${ui.quickMesRefManual ? `<button class="link-btn" style="margin-top:4px;" onclick="capturarCamposLancar();ui.quickMesRefManual=false;ui.quickMesRefStr='';renderLancar()">↺ Voltar para automático</button>` : ''}
+      </div>
       <div class="field">
         <label>Comprovante (opcional)</label>
         <input type="file" id="quickAnexo" accept="image/*,application/pdf" onchange="handleAnexoSelecionado(event)">
@@ -1168,9 +1384,20 @@ function renderLancar(){
       </div>
       ` : `
       <div class="field">
+        <label>Valor</label>
+        <div class="amount-wrap">
+          <span class="prefix">R$</span>
+          <input class="amount-input" type="text" inputmode="decimal" id="quickAmount" placeholder="0,00" value="${ui.quickAmountStr||''}">
+        </div>
+      </div>
+      <div class="field">
+        <label>Data do lançamento</label>
+        <input type="date" id="quickData" value="${dataAtual}" onchange="ui.quickDataStr=this.value;renderLancar()">
+      </div>
+      <div class="field">
         <label>Mês de referência dessa receita</label>
-        <input type="date" id="quickMesRef" value="${ui.quickMesRefStr||todayISO()}">
-        <div class="hint">Ex: recebeu o 13º agora mas quer contabilizar no orçamento de dezembro — escolha uma data dentro daquele mês.</div>
+        <input type="month" id="quickMesRef" value="${mesRefExibido.slice(0,7)}" onchange="ui.quickMesRefManual=true;ui.quickMesRefStr=this.value+'-01';renderLancar()">
+        <div class="hint">Ex: recebeu o 13º agora mas quer contabilizar no orçamento de dezembro — escolha esse mês.</div>
       </div>
       <div class="field">
         <label>Quem recebeu</label>
@@ -1217,19 +1444,19 @@ function handleAnexoSelecionado(ev){
 }
 
 function salvarLancamentoRapido(){
-  const parceladoEl = document.getElementById('quickParcelado');
-  ui.quickParceladoOn = parceladoEl ? parceladoEl.checked : false;
   const valorStr = document.getElementById('quickAmount').value;
   const valor = parseMoneyInput(valorStr);
   const desc = document.getElementById('quickDesc').value.trim() || (ui.quickTipo==='despesa'?'Despesa':'Receita');
-  const mesRefEl = document.getElementById('quickMesRef');
-  const mesRef = mesRefEl ? ymFromISO(mesRefEl.value||todayISO()) : ymKey(new Date());
+  const dataEl = document.getElementById('quickData');
+  const dataLancamento = dataEl ? (dataEl.value || todayISO()) : todayISO();
 
   if(ui.quickTipo==='receita'){
     if(!valor || valor<=0){ showToast('Informe um valor válido'); return; }
+    const mesRefEl = document.getElementById('quickMesRef');
+    const mesRef = mesRefEl ? (mesRefEl.value+'-01').slice(0,7) : ymKey(new Date());
     state.lancamentos.push({
       id: uid(), tipo:'receita', valor, descricao: desc, categoria:'variavel',
-      quem: ui.quickQuem, forma:null, data: todayISO(), mesRef, origem:'manual', criadoEm: Date.now(),
+      quem: ui.quickQuem, forma:null, data: dataLancamento, mesRef, origem:'manual', criadoEm: Date.now(),
     });
     saveState();
     showToast('Receita lançada ✓');
@@ -1240,42 +1467,58 @@ function salvarLancamentoRapido(){
 
   if(!valor || valor<=0){ showToast('Informe um valor válido'); return; }
   if(!ui.quickCategoria){ showToast('Escolha uma categoria'); return; }
-  const dataEl = document.getElementById('quickData');
-  const dataCompra = dataEl.value || todayISO();
   const formaTipo = ui.quickFormaTipo;
   const formaLabel = PAYMENT_TYPE_MAP[formaTipo].label;
   const boletoVencEl = document.getElementById('quickBoletoVenc');
-  const boletoVenc = boletoVencEl ? (boletoVencEl.value || dataCompra) : null;
+  const boletoVenc = formaTipo==='boleto' ? (boletoVencEl ? (boletoVencEl.value || dataLancamento) : dataLancamento) : null;
+  const dataLanc = formaTipo==='boleto' ? boletoVenc : dataLancamento; // boleto: "data do lançamento" é o próprio vencimento
   const cartaoId = formaTipo==='cartao' ? (ui.quickCartaoId || cartaoPadrao().id) : null;
+  const mesRefEl = document.getElementById('quickMesRef');
+  const mesRef = ui.quickMesRefManual && mesRefEl ? (mesRefEl.value+'-01').slice(0,7) : calcularMesRefAutomatico(formaTipo, dataLanc, 0, boletoVenc, cartaoId);
+  const natureza = ui.quickNatureza || 'variavel';
+  const recorrencia = ui.quickRecorrencia || 'pontual';
+  const recorrenciaFim = recorrencia==='periodo' ? ((document.getElementById('quickRecorrenciaFim')?.value||ymAdd(ymKey(new Date()),6))+'-01') : null;
+  const recorrenciaGrupo = recorrencia!=='pontual' ? uid() : null;
 
-  if(formaTipo==='cartao' && ui.quickParceladoOn){
+  const campoBase = { categoria: ui.quickCategoria, quem: ui.quickQuem, natureza, recorrencia, recorrenciaGrupo, recorrenciaFim };
+
+  if(formaTipo==='cartao' && ui.quickParceladoAvista==='parcelado'){
     const n = parseInt(document.getElementById('quickParcelasN').value)||2;
-    const valorParcela = parseMoneyInput(document.getElementById('quickParcelaValor').value) || valor;
+    const partes = dividirEmParcelas(valor, n);
     const grupoId = uid();
     for(let i=0;i<n;i++){
       state.lancamentos.push({
-        id: uid(), tipo:'despesa', valor: valorParcela,
+        id: uid(), tipo:'despesa', valor: partes[i],
         descricao: `${desc} (parcela ${i+1}/${n})`,
-        categoria: ui.quickCategoria, quem: ui.quickQuem, forma: formaLabel, formaTipo, cartaoId,
-        data: dataCompra, dataCaixa: calcularDataCaixa(formaTipo, dataCompra, i, null, cartaoId),
-        mesRef: ymAdd(mesRef, i), origem:'manual', parcelaGrupo: grupoId,
+        ...campoBase, forma: formaLabel, formaTipo, cartaoId,
+        data: dataLanc, dataCaixa: calcularDataCaixa(formaTipo, dataLanc, i, null, cartaoId),
+        mesRef: calcularMesRefAutomatico(formaTipo, dataLanc, i, null, cartaoId),
+        origem:'manual', parcelaGrupo: grupoId,
         parcela: { atual:i+1, total:n }, criadoEm: Date.now(),
       });
     }
     saveState();
     showToast(`${n} parcelas lançadas ✓`);
   } else {
-    state.lancamentos.push({
-      id: uid(), tipo:'despesa', valor, descricao: desc, categoria: ui.quickCategoria,
-      quem: ui.quickQuem, forma: formaLabel, formaTipo, cartaoId, data: dataCompra,
-      dataCaixa: calcularDataCaixa(formaTipo, dataCompra, 0, boletoVenc, cartaoId), mesRef,
+    const semente = {
+      id: uid(), tipo:'despesa', valor, descricao: desc,
+      ...campoBase, forma: formaLabel, formaTipo, cartaoId, data: dataLanc,
+      dataCaixa: calcularDataCaixa(formaTipo, dataLanc, 0, boletoVenc, cartaoId), mesRef,
       origem:'manual', anexoNome: ui.quickAnexo?.nome||null, anexoData: ui.quickAnexo?.data||null,
+      recorrenciaIndice: recorrencia!=='pontual' ? 0 : undefined,
       criadoEm: Date.now(),
-    });
+    };
+    state.lancamentos.push(semente);
+    if(recorrencia!=='pontual'){
+      const n = gerarOcorrenciasRecorrencia(semente);
+      showToast(`Gasto lançado ✓ + ${n} ocorrência${n===1?'':'s'} futura${n===1?'':'s'} gerada${n===1?'':'s'}`);
+    } else {
+      showToast('Gasto lançado ✓');
+    }
     saveState();
-    showToast('Gasto lançado ✓');
   }
-  ui.quickCategoria=null; ui.quickAnexo=null; ui.quickParceladoOn=false;
+  ui.quickCategoria=null; ui.quickAnexo=null; ui.quickParceladoOn=false; ui.quickParceladoAvista='avista';
+  ui.quickRecorrencia='pontual'; ui.quickRecorrenciaFim=''; ui.quickMesRefManual=false;
   limparCamposLancamento();
 }
 function limparCamposLancamento(){
@@ -1718,9 +1961,11 @@ function confirmarSimulacao(){
    RELATÓRIOS
 ========================================================= */
 const PERIOD_PRESETS = {
-  'Este mês': ()=>({de: ymKey(new Date()), ate: ymKey(new Date())}),
-  'Mês passado': ()=>({de: ymAdd(ymKey(new Date()),-1), ate: ymAdd(ymKey(new Date()),-1)}),
+  'Último mês': ()=>({de: ymAdd(ymKey(new Date()),-1), ate: ymAdd(ymKey(new Date()),-1)}),
+  'Mês atual': ()=>({de: ymKey(new Date()), ate: ymKey(new Date())}),
+  'Próximo mês': ()=>({de: ymAdd(ymKey(new Date()),1), ate: ymAdd(ymKey(new Date()),1)}),
   'Últimos 3 meses': ()=>({de: ymAdd(ymKey(new Date()),-2), ate: ymKey(new Date())}),
+  'Próximos 3 meses': ()=>({de: ymKey(new Date()), ate: ymAdd(ymKey(new Date()),2)}),
   'Últimos 6 meses': ()=>({de: ymAdd(ymKey(new Date()),-5), ate: ymKey(new Date())}),
 };
 window.__charts = window.__charts || {};
@@ -1847,6 +2092,7 @@ function renderRelatorios(){
       <div class="segmented" style="margin-top:14px;">
         <button class="${ui.relView==='sintetico'?'active':''}" onclick="ui.relView='sintetico';renderRelatorios()">Sintético</button>
         <button class="${ui.relView==='detalhado'?'active':''}" onclick="ui.relView='detalhado';renderRelatorios()">Detalhado</button>
+        <button class="${ui.relView==='extrato'?'active':''}" onclick="ui.relView='extrato';renderRelatorios()">Extrato da conta</button>
       </div>
     </div>
 
@@ -1880,13 +2126,13 @@ function renderRelatorios(){
         ${evo.folded.map(f=>`<div class="legend-item"><span class="legend-swatch" style="background:${f.color}"></span>${f.label}</div>`).join('')}
       </div>
     </div>
-    ` : `
+    ` : ui.relView==='detalhado' ? `
     <div class="card">
       <h2>Lançamentos <span class="hint">· ${filtradas.length} no período</span></h2>
       ${filtradas.length===0 ? `<div class="empty-state"><div class="ic">📭</div>Nenhum lançamento encontrado.</div>` :
       filtradas.map(l=>renderTxnItem(l)).join('')}
     </div>
-    `}
+    ` : renderExtratoContaHtml()}
   `;
   document.getElementById('view-relatorios').innerHTML = html;
 
@@ -1935,6 +2181,46 @@ function renderTxnItem(l){
     </button>`;
 }
 
+/* Aba "Extrato da conta" em Relatórios: saldo e movimentações dia a dia da conta
+   corrente no período selecionado (mesmo período de mês/ano escolhido lá em cima),
+   incluindo renda fixa, receitas variáveis, despesas (na data em que batem na
+   conta) e aportes/resgates de poupança. */
+function renderExtratoContaHtml(){
+  const de = inicioDoMesISO(ui.relYmDe);
+  const ate = fimDoMesISO(ui.relYmAte);
+  const ex = extratoContaCorrente(de, ate);
+  return `
+    <div class="card">
+      <h2>Extrato da conta corrente <span class="hint">· ${fmtDate(de)} a ${fmtDate(ate)}</span></h2>
+      ${!ex.configurado ? `<div class="insight warn" style="margin-bottom:10px;"><span class="icon">🏦</span><span>Saldo inicial da conta ainda não configurado em <b>Ajustes</b> — o saldo abaixo parte de R$ 0.</span></div>` : ''}
+      <div class="stat-grid">
+        <div class="stat-tile"><div class="stat-label">Saldo no início do período</div><div class="stat-value">${fmtMoneyCompact(ex.saldoBaseAntesPeriodo)}</div></div>
+        <div class="stat-tile"><div class="stat-label">Saldo no fim do período</div><div class="stat-value ${ex.saldoFinal<0?'crit':'good'}">${fmtMoneyCompact(ex.saldoFinal)}</div></div>
+      </div>
+      <div class="stat-grid" style="margin-top:10px;">
+        <div class="stat-tile"><div class="stat-label">Total de entradas</div><div class="stat-value good">+${fmtMoneyCompact(ex.totalEntradas)}</div></div>
+        <div class="stat-tile"><div class="stat-label">Total de saídas</div><div class="stat-value crit">−${fmtMoneyCompact(ex.totalSaidas)}</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Movimentações dia a dia</h2>
+      ${ex.dias.length===0 ? `<div class="empty-state"><div class="ic">📭</div>Nenhuma movimentação nesse período.</div>` :
+      ex.dias.map(d=>`
+        <div class="extrato-dia">
+          <div class="extrato-dia-header">
+            <b>${fmtDate(d.data)}</b>
+            <span>Saldo em conta: <b>${fmtMoney(d.saldoApos)}</b></span>
+          </div>
+          ${d.itens.map(it=>`
+            <div class="extrato-item">
+              <span>${it.desc}</span>
+              <span class="${it.tipo==='entrada'?'good':'crit'}">${it.tipo==='entrada'?'+':'−'}${fmtMoney(it.valor)}</span>
+            </div>`).join('')}
+        </div>`).join('')}
+    </div>
+  `;
+}
+
 /* =========================================================
    LANÇAMENTOS — editar / excluir
 ========================================================= */
@@ -1967,9 +2253,11 @@ function abrirDetalheLancamento(lancId){
       <div class="chip-group">${state.cartoes.map(c=>`<button type="button" class="chip ${(l.cartaoId||cartaoPadrao().id)===c.id?'selected':''}" onclick="chipSelect(this,'editLancCartaoId','${c.id}')">💳 ${c.nome}</button>`).join('')}</div>
     </div>` : ''}
     ${l.parcela ? `<div class="hint" style="margin:6px 0 12px;">Parcela ${l.parcela.atual}/${l.parcela.total} — editar aqui altera só esta parcela. Para excluir todas de uma vez, use "Excluir parcelamento inteiro" abaixo.</div>` : ''}
+    ${l.recorrenciaGrupo ? `<div class="hint" style="margin:6px 0 12px;">Este lançamento faz parte de uma recorrência (${l.recorrencia==='indeterminada'?'tempo indeterminado':'por período'}). Ao salvar ou excluir, vamos perguntar se é só este mês ou também os futuros.</div>` : ''}
     <button class="btn btn-primary" onclick="salvarEdicaoLancamento('${l.id}')">Salvar alterações</button>
     <button class="link-btn" style="margin-top:14px; color:var(--critical);" onclick="excluirLancamento('${l.id}', false)">Excluir este lançamento</button>
     ${l.parcela ? `<button class="link-btn" style="margin-top:10px; color:var(--critical);" onclick="excluirLancamento('${l.id}', true)">Excluir parcelamento inteiro (${l.parcela.total} parcelas)</button>` : ''}
+    ${l.recorrenciaGrupo ? `<button class="link-btn" style="margin-top:10px; color:var(--critical);" onclick="excluirLancamentoRecorrenciaFuturos('${l.id}')">Excluir este e os lançamentos futuros desta recorrência</button>` : ''}
   `);
   ui.editLancCategoria = l.categoria;
   ui.editLancQuem = l.quem;
@@ -1983,26 +2271,45 @@ function salvarEdicaoLancamento(lancId){
   const data = document.getElementById('editLancData').value;
   if(!valor || valor<=0){ showToast('Informe um valor válido'); return; }
   if(!data){ showToast('Informe uma data válida'); return; }
-  l.descricao = desc || l.descricao;
-  l.valor = valor;
-  l.data = data;
-  l.mesRef = ymFromISO(data);
-  if(l.tipo==='despesa'){
-    l.categoria = ui.editLancCategoria || l.categoria;
-    l.quem = ui.editLancQuem || l.quem;
-    if(l.formaTipo==='cartao'){
-      l.cartaoId = ui.editLancCartaoId || l.cartaoId || cartaoPadrao().id;
+
+  // Se faz parte de uma recorrência, pergunta se a mudança de descrição/valor/
+  // categoria/quem deve valer só para este mês ou também para os futuros (a data
+  // e o mês de referência de cada ocorrência nunca são tocados pela propagação).
+  let propagarFuturos = false;
+  if(l.recorrenciaGrupo){
+    propagarFuturos = confirm('Este lançamento faz parte de uma recorrência.\n\nOK = aplicar a mudança neste e em todos os lançamentos futuros da mesma recorrência.\nCancelar = aplicar só neste mês.');
+  }
+
+  const aplicarCampos = (item, isOriginal)=>{
+    item.descricao = desc || item.descricao;
+    item.valor = valor;
+    if(isOriginal){
+      item.data = data;
+      item.mesRef = ymFromISO(data);
     }
-    if(l.formaTipo){
-      const boletoVenc = l.formaTipo==='boleto' ? (l.dataCaixa||data) : null;
-      l.dataCaixa = calcularDataCaixa(l.formaTipo, data, l.parcela ? l.parcela.atual-1 : 0, boletoVenc, l.cartaoId);
+    if(item.tipo==='despesa'){
+      item.categoria = ui.editLancCategoria || item.categoria;
+      item.quem = ui.editLancQuem || item.quem;
+      if(item.formaTipo==='cartao'){
+        item.cartaoId = ui.editLancCartaoId || item.cartaoId || cartaoPadrao().id;
+      }
+      if(isOriginal && item.formaTipo){
+        const boletoVenc = item.formaTipo==='boleto' ? (item.dataCaixa||data) : null;
+        item.dataCaixa = calcularDataCaixa(item.formaTipo, data, item.parcela ? item.parcela.atual-1 : 0, boletoVenc, item.cartaoId);
+      }
+    } else {
+      item.quem = ui.editLancQuem || item.quem;
     }
-  } else {
-    l.quem = ui.editLancQuem || l.quem;
+  };
+  aplicarCampos(l, true);
+  if(propagarFuturos){
+    const hojeIso = todayISO();
+    state.lancamentos.filter(x=> x.recorrenciaGrupo===l.recorrenciaGrupo && x.id!==l.id && x.data>=hojeIso)
+      .forEach(x=>aplicarCampos(x, false));
   }
   saveState();
   closeSheet();
-  showToast('Lançamento atualizado ✓');
+  showToast(propagarFuturos ? 'Lançamento e futuros atualizados ✓' : 'Lançamento atualizado ✓');
 }
 function excluirLancamento(lancId, grupoInteiro){
   const l = state.lancamentos.find(x=>x.id===lancId);
@@ -2017,6 +2324,25 @@ function excluirLancamento(lancId, grupoInteiro){
   saveState();
   closeSheet();
   showToast('Lançamento excluído ✓');
+}
+/* Exclui este lançamento e todas as ocorrências futuras (data >= hoje) da mesma
+   recorrência — usado para "cancelar a assinatura a partir de agora". Ocorrências
+   passadas (histórico) nunca são apagadas. */
+function excluirLancamentoRecorrenciaFuturos(lancId){
+  const l = state.lancamentos.find(x=>x.id===lancId);
+  if(!l || !l.recorrenciaGrupo) return;
+  const hojeIso = todayISO();
+  const alvo = state.lancamentos.filter(x=> x.recorrenciaGrupo===l.recorrenciaGrupo && (x.id===l.id || x.data>=hojeIso));
+  if(!confirm(`Excluir este lançamento e mais ${alvo.length-1} ocorrência(s) futura(s) desta recorrência? Lançamentos passados não serão apagados.`)) return;
+  const idsAlvo = new Set(alvo.map(x=>x.id));
+  state.lancamentos = state.lancamentos.filter(x=>!idsAlvo.has(x.id));
+  // Marca a recorrência como encerrada (vira "período" com fim = hoje) para que o
+  // boot não recrie as ocorrências futuras que acabamos de apagar.
+  const semente = state.lancamentos.find(x=>x.recorrenciaGrupo===l.recorrenciaGrupo && x.recorrenciaIndice===0);
+  if(semente){ semente.recorrencia = 'periodo'; semente.recorrenciaFim = hojeIso; }
+  saveState();
+  closeSheet();
+  showToast('Recorrência encerrada a partir deste lançamento ✓');
 }
 
 /* =========================================================
@@ -2056,7 +2382,8 @@ function renderPoupanca(){
           <button class="btn btn-secondary" onclick="abrirTransferSheet('${p.id}','aporte')">↓ Transferir da conta</button>
           <button class="btn btn-secondary" onclick="abrirTransferSheet('${p.id}','resgate')">↑ Resgatar p/ conta</button>
         </div>
-        <button class="link-btn" style="margin-top:10px;" onclick="abrirEditarPote('${p.id}')">Editar pote</button>
+        <button class="link-btn" style="margin-top:10px;" onclick="abrirExtratoPote('${p.id}')">Ver extrato</button>
+        <button class="link-btn" style="margin-top:10px; margin-left:16px;" onclick="abrirEditarPote('${p.id}')">Editar pote</button>
         <button class="link-btn" style="margin-top:10px; margin-left:16px; color:var(--critical);" onclick="removerPote('${p.id}')">Excluir</button>
       </div>`;
     }).join('')}
@@ -2150,6 +2477,30 @@ function confirmarTransferPoupanca(poteId, tipo){
   closeSheet();
   showToast(tipo==='aporte' ? 'Valor transferido para a poupança ✓' : 'Valor resgatado para a conta ✓');
   renderPoupanca();
+}
+/* Extrato de um pote: histórico de entradas (aportes + saldo inicial) e saídas
+   (resgates), mais recentes primeiro, com o saldo do pote logo após cada evento. */
+function abrirExtratoPote(poteId){
+  const p = state.potes.find(x=>x.id===poteId);
+  if(!p) return;
+  const eventos = [{ data: p.dataBase||todayISO(), desc:'Saldo inicial ao criar o pote', tipo:'aporte', valor: Number(p.saldoBase||0), inicial:true }]
+    .concat(movimentosDoPote(poteId).map(m=>({ data:m.data, desc: m.tipo==='aporte'?'Transferência da conta':'Resgate para a conta', tipo:m.tipo, valor:Number(m.valor||0) })));
+  eventos.sort((a,b)=> a.data.localeCompare(b.data));
+  let saldoAcum = 0;
+  const linhas = eventos.map(ev=>{
+    saldoAcum += ev.tipo==='aporte' ? ev.valor : -ev.valor;
+    return { ...ev, saldoApos: saldoAcum };
+  }).reverse(); // mais recente primeiro
+  openSheet(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><h3>Extrato · ${p.icone||'🐷'} ${p.nome}</h3><button class="sheet-close" onclick="closeSheet()">✕</button></div>
+    ${linhas.length===0 ? `<div class="empty-state">Nenhuma movimentação ainda.</div>` :
+    linhas.map(l=>`
+      <div class="extrato-item" style="border-bottom:1px solid var(--gridline); padding:8px 0;">
+        <span>${l.desc}<br><span class="hint">${fmtDate(l.data)} · saldo: ${fmtMoney(l.saldoApos)}</span></span>
+        <span class="${l.tipo==='aporte'?'good':'crit'}">${l.tipo==='aporte'?'+':'−'}${fmtMoney(l.valor)}</span>
+      </div>`).join('')}
+  `);
 }
 
 /* =========================================================
@@ -2542,7 +2893,9 @@ function desconectarSync(){
   if(state.settings.firebase){
     connectFirebase(state.settings.firebase).catch(e=>console.error('auto-sync', e));
   }
-  renderAll();
+  // Completa o horizonte de 12 meses de qualquer recorrência indeterminada
+  // (ex: Netflix) que ainda não tenha lançamentos futuros suficientes gerados.
+  if(completarHorizonteRecorrencias()){ saveState(); } else { renderAll(); }
 })();
 
 </script>
