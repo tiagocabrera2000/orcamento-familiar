@@ -486,6 +486,7 @@ function defaultState(){
 let state = loadState();
 rebuildCategoriesFromState();
 let fbApp = null, fbDb = null, fbUnsub = null, fbReady = false;
+let ultimoAvisoCanalTravado = 0; // throttle do banner de "canal não respondeu", pra não repetir a cada retry
 
 function loadState(){
   try{
@@ -3109,10 +3110,52 @@ async function connectFirebase(cfg){
   // diagnóstico mede com timeout de 12s. Avisa em vez de deixar o selo "Só
   // neste aparelho" sem explicação.
   setTimeout(()=>{
-    if(!primeiroSnapshotRecebido){
-      mostrarErroDiagnostico('A conexão de sincronização em tempo real não respondeu em 15s (nem sucesso, nem erro). O app vai continuar tentando, mas os dados deste aparelho podem estar desatualizados.');
-      renderAll();
+    if(primeiroSnapshotRecebido) return;
+    // Bug encontrado em 2026-08-25 (parte 3): esse timeout já detectava o canal
+    // travado e mostrava o aviso, mas na prática NADA tentava de novo depois —
+    // a função connectFirebase() já tinha retornado com sucesso (só registrar o
+    // onSnapshot não dá erro), então conectarComRetentativa() nunca via uma
+    // falha pra reagir. O app dizia "vou continuar tentando" mas não tentava.
+    // Corrigido: aqui a gente mesmo derruba o canal morto, busca os dados atuais
+    // direto via get() (não depende do canal de tempo real funcionar) e reabre
+    // uma nova tentativa de conexão do zero.
+    console.warn('Sync: canal de tempo real não respondeu em 15s — derrubando e tentando de novo.');
+    const agora = Date.now();
+    if(agora - ultimoAvisoCanalTravado > 120000){ // no máximo 1 aviso a cada 2 minutos
+      ultimoAvisoCanalTravado = agora;
+      mostrarErroDiagnostico('A conexão de sincronização em tempo real não respondeu em 15s. Buscando os dados mais recentes de outra forma e tentando reconectar...');
     }
+    if(fbUnsub){ fbUnsub(); fbUnsub = null; }
+    docRef.get().then(snap=>{
+      if(!snap.exists) return;
+      const remote = snap.data();
+      if(!remote || !remote.updatedAt) return;
+      const remoteLancamentos = remote.lancamentos || [];
+      const remotoTemMuitoMaisDados = remoteLancamentos.length > 0 && remoteLancamentos.length > state.lancamentos.length + 5;
+      if(remote.updatedAt <= state.updatedAt && !remotoTemMuitoMaisDados) return;
+      if(state.lancamentos.length > 0 && remoteLancamentos.length === 0) return;
+      state = {
+        ...state,
+        lancamentos: remote.lancamentos || [],
+        potes: remote.potes || [],
+        movimentosPoupanca: remote.movimentosPoupanca || [],
+        categorias: (remote.categorias && remote.categorias.length) ? remote.categorias : state.categorias,
+        cartoes: (remote.cartoes && remote.cartoes.length) ? remote.cartoes : state.cartoes,
+        settings: { ...state.settings, ...(remote.settings||{}) },
+        updatedAt: remote.updatedAt,
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      rebuildCategoriesFromState();
+      renderAll();
+      showToast('Dados atualizados (busca direta, sem tempo real) ✓');
+    }).catch(e=>{
+      console.error('get() de emergência após timeout', e);
+      mostrarErroDiagnostico('Não consegui buscar os dados nem por conexão direta: ' + e.message);
+    }).finally(()=>{
+      // Tenta reabrir o canal de tempo real do zero, com o mesmo limite de 3
+      // tentativas de conectarComRetentativa — pra não ficar tentando pra sempre.
+      conectarComRetentativa(cfg);
+    });
   }, 15000);
   renderAll();
 }
