@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico de sincronização</title>
+<style>
+  body { font-family: -apple-system, sans-serif; padding: 20px; font-size: 18px; line-height: 1.5; background:#111; color:#eee; }
+  .item { padding: 14px; margin-bottom: 12px; border-radius: 8px; background:#222; }
+  .ok { border-left: 6px solid #2ecc71; }
+  .fail { border-left: 6px solid #e74c3c; }
+  .pending { border-left: 6px solid #999; }
+  h1 { font-size: 22px; }
+  pre { white-space: pre-wrap; word-break: break-all; font-size: 13px; background:#000; padding:8px; border-radius:6px; }
+</style>
+</head>
+<body>
+<h1>🔍 Diagnóstico de sincronização — Orçamento Cabrera</h1>
+<p>Essa página não mexe em nenhum dado — só testa a conexão. Aguarde terminar (uns 10-15 segundos) e me manda um print desta tela inteira.</p>
+<div id="results"></div>
+
+<script>
+const CFG = {
+  apiKey: "AIzaSyAEptK9bGU8jf6kLCL51BiQOUiTRBn7A6Y",
+  projectId: "cabrera-family-finances",
+  familyCode: "cabrera-familia",
+};
+const results = document.getElementById('results');
+function addItem(id, label){
+  const div = document.createElement('div');
+  div.className = 'item pending';
+  div.id = id;
+  div.innerHTML = '<b>⏳ ' + label + '</b>';
+  results.appendChild(div);
+  return div;
+}
+function setResult(div, ok, detail){
+  div.className = 'item ' + (ok ? 'ok' : 'fail');
+  div.innerHTML = '<b>' + (ok ? '✅ ' : '❌ ') + div.querySelector('b').textContent.replace(/^⏳ /,'') + '</b>' + (detail ? '<pre>'+detail+'</pre>' : '');
+}
+
+(async () => {
+  // Teste 1: internet básica
+  const t1 = addItem('t1', 'Internet básica (carregar um site qualquer)');
+  try {
+    await fetch('https://www.google.com/generate_204', { mode: 'no-cors' });
+    setResult(t1, true);
+  } catch(e) { setResult(t1, false, String(e)); }
+
+  // Teste 2: carregar o SDK do Firebase via CDN (gstatic.com)
+  const t2 = addItem('t2', 'Carregar biblioteca do Firebase (gstatic.com)');
+  try {
+    const r = await fetch('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+    if(r.ok) setResult(t2, true, 'status ' + r.status);
+    else setResult(t2, false, 'status ' + r.status);
+  } catch(e) { setResult(t2, false, String(e)); }
+
+  // Teste 3: ler o documento da família via API REST do Firestore (sem SDK)
+  const t3 = addItem('t3', 'Ler os dados da família no Firestore (REST direto)');
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${CFG.projectId}/databases/(default)/documents/familias/${CFG.familyCode}?key=${CFG.apiKey}`;
+    const r = await fetch(url);
+    const body = await r.text();
+    if(r.ok){
+      let n = 'desconhecido';
+      try{
+        const j = JSON.parse(body);
+        const arr = j.fields && j.fields.lancamentos && j.fields.lancamentos.arrayValue && j.fields.lancamentos.arrayValue.values;
+        n = arr ? arr.length : 'campo lancamentos não encontrado';
+      }catch(e){}
+      setResult(t3, true, 'status ' + r.status + ' — lançamentos encontrados: ' + n);
+    } else {
+      setResult(t3, false, 'status ' + r.status + '\n' + body.slice(0,500));
+    }
+  } catch(e) { setResult(t3, false, String(e) + (e.stack ? '\n'+e.stack.slice(0,300) : '')); }
+
+  // Teste 4: WebChannel do Firestore (o que o SDK realmente usa pra sincronizar em tempo real)
+  const t4 = addItem('t4', 'Canal de tempo real do Firestore (o que trava a sincronização de verdade)');
+  try {
+    const url = `https://firestore.googleapis.com/google.firestore.v1.Firestore/Listen/channel?VER=8&database=projects%2F${CFG.projectId}%2Fdatabases%2F(default)&RID=12345&CVER=22&X-HTTP-Session-Id=gsessionid&zx=abc123&t=1`;
+    const r = await fetch(url, { method: 'OPTIONS' });
+    setResult(t4, true, 'status ' + r.status + ' (conseguiu alcançar o endpoint)');
+  } catch(e) { setResult(t4, false, String(e)); }
+
+  const info = document.createElement('div');
+  info.className = 'item pending';
+  info.innerHTML = '<b>ℹ️ Info do navegador</b><pre>' + navigator.userAgent + '\nOnline: ' + navigator.onLine + '\nConexão: ' + (navigator.connection ? JSON.stringify({type:navigator.connection.effectiveType, saveData:navigator.connection.saveData}) : 'n/d') + '</pre>';
+  results.appendChild(info);
+})();
+</script>
+</body>
+</html>
