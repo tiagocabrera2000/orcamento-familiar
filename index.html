@@ -1704,10 +1704,18 @@ function confirmarImportacaoFatura(){
 /* ---- Fatura: upload de arquivo (PDF / imagem) ---- */
 function loadScriptOnce(src){
   return new Promise((resolve,reject)=>{
-    if(document.querySelector(`script[data-src="${src}"]`)) return resolve();
+    const existing = document.querySelector(`script[data-src="${src}"]`);
+    // Se já existe uma tag pra esse script E ela terminou de carregar com sucesso
+    // (marcada abaixo via data-loaded), não carrega de novo. Mas se uma tentativa
+    // anterior travou ou falhou (ex: rede instável no celular), essa tag antiga
+    // nunca chega a "loaded" — nesse caso removemos e tentamos de novo, ao invés
+    // de resolver na hora e deixar `firebase` indefinido silenciosamente.
+    if(existing && existing.dataset.loaded === '1') return resolve();
+    if(existing) existing.remove();
     const s = document.createElement('script');
     s.src = src; s.dataset.src = src;
-    s.onload = resolve; s.onerror = reject;
+    s.onload = () => { s.dataset.loaded = '1'; resolve(); };
+    s.onerror = () => { s.remove(); reject(new Error('Falha ao carregar script: ' + src)); };
     document.head.appendChild(s);
   });
 }
@@ -3029,12 +3037,20 @@ async function connectFirebase(cfg){
   fbDb = firebase.firestore();
   const docRef = fbDb.collection('familias').doc(cfg.familyCode);
   if(fbUnsub) fbUnsub();
+  // fbReady só vira true quando o primeiro snapshot de verdade chega (sucesso OU
+  // erro) — nunca só por termos chamado onSnapshot(). Isso evita o selo
+  // "Sincronizado" aparecer quando, na prática, o canal de tempo real nunca
+  // conseguiu abrir (foi exatamente esse selo enganoso que escondeu o bug do
+  // celular por tanto tempo).
+  let primeiroSnapshotRecebido = false;
   fbUnsub = docRef.onSnapshot(snap=>{
     try{
-      if(!snap.exists) return;
+      primeiroSnapshotRecebido = true;
+      fbReady = true;
+      if(!snap.exists){ renderAll(); return; }
       const remote = snap.data();
-      if(!remote || !remote.updatedAt) return;
-      if(remote.updatedAt <= state.updatedAt) return;
+      if(!remote || !remote.updatedAt){ renderAll(); return; }
+      if(remote.updatedAt <= state.updatedAt){ renderAll(); return; }
       const remoteLancamentos = remote.lancamentos || [];
       // Rede de segurança (v5.1): nunca aceitar cegamente um remoto que
       // apagaria TUDO que temos localmente — sinal de aparelho com
@@ -3061,9 +3077,25 @@ async function connectFirebase(cfg){
     }catch(e){
       console.error('onSnapshot handler error', e);
       mostrarErroDiagnostico('Erro ao aplicar dados recebidos: ' + e.message);
+      renderAll();
     }
-  }, err=>{ console.error(err); mostrarErroDiagnostico('Erro de sincronização (onSnapshot): ' + err.code + ' — ' + err.message); });
-  fbReady = true;
+  }, err=>{
+    primeiroSnapshotRecebido = true;
+    fbReady = false;
+    console.error(err);
+    mostrarErroDiagnostico('Erro de sincronização (onSnapshot): ' + err.code + ' — ' + err.message);
+    renderAll();
+  });
+  // Se depois de 15s nenhum snapshot (sucesso ou erro) chegou, o canal de tempo
+  // real travou silenciosamente — mesma situação que o teste 4 da página de
+  // diagnóstico mede com timeout de 12s. Avisa em vez de deixar o selo "Só
+  // neste aparelho" sem explicação.
+  setTimeout(()=>{
+    if(!primeiroSnapshotRecebido){
+      mostrarErroDiagnostico('A conexão de sincronização em tempo real não respondeu em 15s (nem sucesso, nem erro). O app vai continuar tentando, mas os dados deste aparelho podem estar desatualizados.');
+      renderAll();
+    }
+  }, 15000);
   renderAll();
 }
 async function syncPush(){
@@ -3096,6 +3128,23 @@ async function syncPush(){
     settings: { rendaFixa: state.settings.rendaFixa, orcamento: state.settings.orcamento, contaCorrente: state.settings.contaCorrente },
     updatedAt: state.updatedAt,
   }, { merge: true });
+}
+// Conecta ao Firebase na abertura do app. Se falhar (ex: script do Firebase não
+// carregou por causa de rede instável no celular), tenta mais 2 vezes com um
+// pequeno intervalo antes de desistir — e SEMPRE avisa visivelmente se não
+// conseguir, em vez de deixar o app "sincronizado" na aparência mas sem
+// conexão de verdade nos bastidores (bug do badge, ver renderSyncBadge).
+async function conectarComRetentativa(cfg, tentativa=1){
+  try{
+    await connectFirebase(cfg);
+  }catch(e){
+    console.error('auto-sync tentativa ' + tentativa, e);
+    if(tentativa < 3){
+      setTimeout(()=>conectarComRetentativa(cfg, tentativa+1), 2000 * tentativa);
+    }else{
+      mostrarErroDiagnostico('Não consegui conectar à sincronização depois de 3 tentativas: ' + (e && e.message ? e.message : String(e)));
+    }
+  }
 }
 async function salvarConfigSync(){
   const apiKey = document.getElementById('fbApiKey').value.trim();
@@ -3130,7 +3179,7 @@ function desconectarSync(){
     document.documentElement.setAttribute('data-theme', state.settings.theme);
   }
   if(state.settings.firebase){
-    connectFirebase(state.settings.firebase).catch(e=>console.error('auto-sync', e));
+    conectarComRetentativa(state.settings.firebase);
   }
   // Completa o horizonte de 12 meses de qualquer recorrência indeterminada
   // (ex: Netflix) que ainda não tenha lançamentos futuros suficientes gerados.
