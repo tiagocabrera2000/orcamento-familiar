@@ -470,11 +470,6 @@ function defaultState(){
     categorias: CATEGORIES_SEED.map(c=>({ key:c.key, label:c.label, icon:c.icon, fixa:c.fixa })),
     // {id,nome,diaFechamento,diaVencimento} — um por cartão físico; lançamentos guardam cartaoId
     cartoes: [ { id: 'cartao-1', nome: 'Cartão de crédito', diaFechamento: 22, diaVencimento: 5 } ],
-    // Lápides de exclusão para o merge de sincronização entre aparelhos —
-    // {id, tipo:'lancamento'|'pote'|'movimentoPoupanca', excluidoEm}. Ver
-    // mesclarListasPorId()/saveState() — sem isso, um item apagado num aparelho
-    // podia "ressuscitar" ao sincronizar com outro que ainda não sabia da exclusão.
-    tombstones: [],
     settings: {
       rendaFixa: [
         { id: uid(), dia: 15, valor: 15940, desc: 'Salário (1ª parcela)' },
@@ -509,7 +504,6 @@ function loadState(){
       ...def, ...parsed,
       potes: parsed.potes || [],
       movimentosPoupanca: parsed.movimentosPoupanca || [],
-      tombstones: parsed.tombstones || [],
       // dados salvos antes desta versão não têm "categorias" — usa o padrão de fábrica
       categorias: (parsed.categorias && parsed.categorias.length) ? parsed.categorias : def.categorias,
       cartoes,
@@ -519,59 +513,9 @@ function loadState(){
     };
   }catch(e){ console.error(e); return defaultState(); }
 }
-// Listas do state que participam do merge de sincronização por ID (ver
-// mesclarListasPorId() e syncPush()/onSnapshot abaixo). Mantidas num só lugar
-// pra não desalinhar as três pontas (marcarAtualizacoes, tombstones, merge).
-const LISTAS_SINCRONIZADAS = [
-  { campo: 'lancamentos', tipoTombstone: 'lancamento' },
-  { campo: 'potes', tipoTombstone: 'pote' },
-  { campo: 'movimentosPoupanca', tipoTombstone: 'movimentoPoupanca' },
-];
-// Compara o state novo com o snapshot anterior (localStorage) e: (1) carimba
-// `atualizadoEm` em qualquer item novo ou que mudou de conteúdo, preservando o
-// `atualizadoEm` de itens que não mudaram; (2) registra uma lápide em
-// `state.tombstones` para qualquer item que existia antes e sumiu (exclusão).
-// É tudo feito aqui, num único ponto central, em vez de em cada função de
-// criar/editar/excluir espalhada pelo app — assim nenhum site de mutação
-// precisa lembrar de carimbar nada, e não tem como esquecer um.
-function marcarAtualizacoesParaSync(stateAnterior){
-  const agora = Date.now();
-  LISTAS_SINCRONIZADAS.forEach(({campo, tipoTombstone})=>{
-    const anteriorPorId = new Map((stateAnterior?.[campo]||[]).map(item=>[item.id, item]));
-    const atualIds = new Set();
-    (state[campo]||[]).forEach(item=>{
-      atualIds.add(item.id);
-      const antigo = anteriorPorId.get(item.id);
-      if(!antigo){
-        item.atualizadoEm = item.atualizadoEm || agora;
-      } else {
-        // Compara ignorando o próprio campo atualizadoEm pra saber se algo
-        // realmente mudou (JSON.stringify de objeto plano é suficiente aqui —
-        // são sempre os mesmos poucos campos primitivos, sem nesting profundo).
-        const { atualizadoEm: _a, ...antigoSemStamp } = antigo;
-        const { atualizadoEm: _b, ...itemSemStamp } = item;
-        if(JSON.stringify(antigoSemStamp) !== JSON.stringify(itemSemStamp)){
-          item.atualizadoEm = agora;
-        } else {
-          item.atualizadoEm = antigo.atualizadoEm || agora;
-        }
-      }
-    });
-    // Itens que existiam no snapshot anterior e sumiram do state atual = exclusão.
-    (stateAnterior?.[campo]||[]).forEach(item=>{
-      if(!atualIds.has(item.id)){
-        state.tombstones = state.tombstones || [];
-        if(!state.tombstones.some(t=>t.id===item.id && t.tipo===tipoTombstone)){
-          state.tombstones.push({ id: item.id, tipo: tipoTombstone, excluidoEm: agora });
-        }
-      }
-    });
-  });
-}
 function saveState(opts={}){
   state.updatedAt = Date.now();
   rebuildCategoriesFromState();
-  let stateAnterior = null;
   // Rede de segurança: antes de sobrescrever o localStorage, guarda uma cópia
   // do que estava salvo — desde que ela tivesse lançamentos. Isso garante que
   // sempre exista um "último estado bom conhecido" para recuperação manual,
@@ -579,15 +523,12 @@ function saveState(opts={}){
   try{
     const atual = localStorage.getItem(LS_KEY);
     if(atual){
-      stateAnterior = JSON.parse(atual);
+      const stateAnterior = JSON.parse(atual);
       if(stateAnterior.lancamentos && stateAnterior.lancamentos.length){
         localStorage.setItem(LS_BACKUP_KEY, atual);
       }
     }
   }catch(e){ /* backup é best-effort, nunca deve travar o salvamento */ }
-  if(!opts.skipMarcarAtualizacoes){
-    try{ marcarAtualizacoesParaSync(stateAnterior); }catch(e){ console.error('marcarAtualizacoesParaSync', e); }
-  }
   localStorage.setItem(LS_KEY, JSON.stringify(state));
   if(!opts.skipSync) syncPushDebounced();
   renderAll();
@@ -3045,64 +2986,14 @@ function restaurarBackupAutomatico(){
    aparelhos mostrando "Sincronizado" (e mostram mesmo: ambos convergem pro
    mesmo estado, só que um estado que perdeu uma entrada no meio do caminho).
 
-   Correção: mesclarListasPorId() faz união por id entre duas listas (local e
-   remota), resolvendo qualquer id presente nas duas pelo maior
-   `atualizadoEm` (ver marcarAtualizacoesParaSync em saveState()), e removendo
-   qualquer id que tenha uma lápide (tombstone) mais recente que o item —
-   assim uma exclusão feita num aparelho não "ressuscita" o item ao
-   sincronizar com outro que ainda não sabia da exclusão. */
-function mesclarListasPorId(local, remoto, tombstonesLocal, tombstonesRemoto, tipoTombstone){
-  const porId = new Map();
-  (local||[]).forEach(item=> porId.set(item.id, item));
-  (remoto||[]).forEach(item=>{
-    const existente = porId.get(item.id);
-    if(!existente){ porId.set(item.id, item); return; }
-    const tsExistente = existente.atualizadoEm || existente.criadoEm || 0;
-    const tsNovo = item.atualizadoEm || item.criadoEm || 0;
-    if(tsNovo > tsExistente) porId.set(item.id, item);
-  });
-  // Aplica lápides: remove qualquer item cujo id tenha sido excluído em
-  // QUALQUER um dos dois lados, desde que a exclusão seja mais recente que a
-  // última atualização conhecida do item (evita apagar uma edição feita
-  // depois da exclusão em outro aparelho, embora esse caso seja raro).
-  const todasLapides = [...(tombstonesLocal||[]), ...(tombstonesRemoto||[])].filter(t=>t.tipo===tipoTombstone);
-  const lapidePorId = new Map();
-  todasLapides.forEach(t=>{
-    const atual = lapidePorId.get(t.id);
-    if(!atual || t.excluidoEm > atual.excluidoEm) lapidePorId.set(t.id, t);
-  });
-  lapidePorId.forEach((lapide, id)=>{
-    const item = porId.get(id);
-    if(item){
-      const tsItem = item.atualizadoEm || item.criadoEm || 0;
-      if(lapide.excluidoEm >= tsItem) porId.delete(id);
-    }
-  });
-  return Array.from(porId.values());
-}
-function mesclarTombstones(local, remoto){
-  const porChave = new Map();
-  [...(local||[]), ...(remoto||[])].forEach(t=>{
-    const chave = t.tipo+'::'+t.id;
-    const atual = porChave.get(chave);
-    if(!atual || t.excluidoEm > atual.excluidoEm) porChave.set(chave, t);
-  });
-  return Array.from(porChave.values());
-}
-function mesclarEstadoComRemoto(remote){
-  const tombstonesLocais = state.tombstones || [];
-  const tombstonesRemotos = remote.tombstones || [];
-  const novoState = { ...state };
-  LISTAS_SINCRONIZADAS.forEach(({campo, tipoTombstone})=>{
-    novoState[campo] = mesclarListasPorId(state[campo], remote[campo], tombstonesLocais, tombstonesRemotos, tipoTombstone);
-  });
-  novoState.tombstones = mesclarTombstones(tombstonesLocais, tombstonesRemotos);
-  novoState.categorias = (remote.categorias && remote.categorias.length) ? remote.categorias : state.categorias;
-  novoState.cartoes = (remote.cartoes && remote.cartoes.length) ? remote.cartoes : state.cartoes;
-  novoState.settings = { ...state.settings, rendaFixa: remote.settings?.rendaFixa || state.settings.rendaFixa, orcamento: remote.settings?.orcamento || state.settings.orcamento, contaCorrente: remote.settings?.contaCorrente || state.settings.contaCorrente };
-  novoState.updatedAt = Math.max(state.updatedAt||0, remote.updatedAt||0);
-  return novoState;
-}
+   Uma tentativa de correção baseada em merge por id + lápides de exclusão foi
+   testada e publicada em 2026-08-24 (v8), mas se mostrou instável em uso real
+   (gerou exclusões fantasmas de lançamentos por causa de condição de corrida
+   entre onSnapshot/syncPush/saveState) e foi revertida no mesmo dia para esta
+   versão simples — que é a que está validada há semanas em produção. Ver
+   memória do projeto (seção v8) para o diagnóstico completo antes de tentar
+   de novo; a próxima tentativa precisa marcar exclusões no exato ponto onde o
+   usuário exclui algo, nunca inferir por diff de array. */
 async function connectFirebase(cfg){
   await loadScriptOnce('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
   await loadScriptOnce('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js');
@@ -3121,40 +3012,30 @@ async function connectFirebase(cfg){
     if(!snap.exists) return;
     const remote = snap.data();
     if(!remote || !remote.updatedAt) return;
-    // Nada mudou desde a última vez que processamos a nuvem (ex: eco do nosso
-    // próprio push) — nada a fazer.
-    if(remote.updatedAt <= (state.ultimoRemotoProcessado||0) && remote.updatedAt <= state.updatedAt) return;
+    if(remote.updatedAt <= state.updatedAt) return;
     const remoteLancamentos = remote.lancamentos || [];
-    // Rede de segurança (herdada da v5.1): nunca aceitar cegamente um remoto
-    // que apagaria TUDO que temos localmente sem nenhuma lápide explicando
-    // por quê — sinal de aparelho com armazenamento vazio/corrompido tendo
-    // empurrado um estado vazio. Continua valendo mesmo com merge por id,
-    // como última linha de defesa.
-    if(state.lancamentos.length > 0 && remoteLancamentos.length === 0 && !(remote.tombstones && remote.tombstones.length)){
-      console.warn('Sync: ignorando snapshot remoto vazio (sem lápides) para não apagar lançamentos locais. Reenviando estado local.');
+    // Rede de segurança (v5.1): nunca aceitar cegamente um remoto que
+    // apagaria TUDO que temos localmente — sinal de aparelho com
+    // armazenamento vazio/corrompido tendo empurrado um estado vazio.
+    if(state.lancamentos.length > 0 && remoteLancamentos.length === 0){
+      console.warn('Sync: ignorando snapshot remoto vazio para não apagar lançamentos locais. Reenviando estado local.');
       syncPush().catch(e=>console.error('sync re-push', e));
       return;
     }
-    const mesclado = mesclarEstadoComRemoto(remote);
-    mesclado.ultimoRemotoProcessado = remote.updatedAt;
-    const mudou = JSON.stringify(mesclado.lancamentos)!==JSON.stringify(state.lancamentos)
-      || JSON.stringify(mesclado.potes)!==JSON.stringify(state.potes)
-      || JSON.stringify(mesclado.movimentosPoupanca)!==JSON.stringify(state.movimentosPoupanca);
-    state = mesclado;
+    state = {
+      ...state,
+      lancamentos: remote.lancamentos || [],
+      potes: remote.potes || [],
+      movimentosPoupanca: remote.movimentosPoupanca || [],
+      categorias: (remote.categorias && remote.categorias.length) ? remote.categorias : state.categorias,
+      cartoes: (remote.cartoes && remote.cartoes.length) ? remote.cartoes : state.cartoes,
+      settings: { ...state.settings, ...(remote.settings||{}) },
+      updatedAt: remote.updatedAt,
+    };
     localStorage.setItem(LS_KEY, JSON.stringify(state));
     rebuildCategoriesFromState();
     renderAll();
-    if(mudou) showToast('Dados atualizados de outro aparelho ✓');
-    // Se o merge resultou em algo diferente do que a nuvem tinha sozinha (ex:
-    // reincorporou um lançamento nosso que o remoto não tinha), reenvia pra
-    // nuvem ficar com a união também — sem isso, o próximo snapshot de outro
-    // aparelho ainda veria o documento remoto incompleto.
-    const remotoTinhaTudo = remoteLancamentos.length===mesclado.lancamentos.length
-      && (remote.potes||[]).length===mesclado.potes.length
-      && (remote.movimentosPoupanca||[]).length===mesclado.movimentosPoupanca.length;
-    if(!remotoTinhaTudo){
-      syncPush().catch(e=>console.error('sync re-push pós-merge', e));
-    }
+    showToast('Dados atualizados de outro aparelho ✓');
   }, err=>{ console.error(err); showToast('Erro de sincronização — verifique a configuração'); });
   fbReady = true;
   renderAll();
@@ -3163,45 +3044,27 @@ async function syncPush(){
   if(!fbDb || !state.settings.firebase) return;
   const cfg = state.settings.firebase;
   const docRef = fbDb.collection('familias').doc(cfg.familyCode);
-  // Antes de escrever, busca o que já está na nuvem AGORA e mescla por id com
-  // o estado local — em vez de simplesmente mandar o array local por cima.
-  // É essa checagem que fecha a janela de corrida entre dois aparelhos
-  // lançando algo quase ao mesmo tempo: mesmo que o outro aparelho tenha
-  // empurrado um lançamento novo um instante atrás, esse push aqui incorpora
-  // ele em vez de sobrescrevê-lo. Também serve como a rede de segurança já
-  // existente contra push vazio por cima de dados bons (união com vazio =
-  // mantém o que já está lá).
-  try{
-    const snap = await docRef.get();
-    if(snap.exists){
-      const remote = snap.data();
-      if(remote && remote.updatedAt){
-        const antesLancamentos = state.lancamentos;
-        const antesPotes = state.potes;
-        const antesMov = state.movimentosPoupanca;
-        const mesclado = mesclarEstadoComRemoto(remote);
-        state.lancamentos = mesclado.lancamentos;
-        state.potes = mesclado.potes;
-        state.movimentosPoupanca = mesclado.movimentosPoupanca;
-        state.tombstones = mesclado.tombstones;
-        if((remote.categorias||[]).length && !(state.categorias||[]).length) state.categorias = remote.categorias;
-        if((remote.cartoes||[]).length && !(state.cartoes||[]).length) state.cartoes = remote.cartoes;
-        localStorage.setItem(LS_KEY, JSON.stringify(state));
-        const mudouAoMesclar = JSON.stringify(antesLancamentos)!==JSON.stringify(state.lancamentos)
-          || JSON.stringify(antesPotes)!==JSON.stringify(state.potes)
-          || JSON.stringify(antesMov)!==JSON.stringify(state.movimentosPoupanca);
-        // Só re-renderiza se o merge trouxe algo novo de outro aparelho — evita
-        // interromper o usuário no meio de digitar um lançamento à toa.
-        if(mudouAoMesclar) renderAll();
+  // Rede de segurança (v5.1): nunca escrever um array de lançamentos vazio
+  // por cima de um documento remoto que já tem dados — sinal de que este
+  // aparelho está com o armazenamento vazio/corrompido, não que a família
+  // ficou sem lançamentos de verdade.
+  if(state.lancamentos.length === 0){
+    try{
+      const snap = await docRef.get();
+      if(snap.exists){
+        const remote = snap.data();
+        if(remote && (remote.lancamentos||[]).length > 0){
+          console.warn('Sync: abortando push vazio por cima de dados bons na nuvem.');
+          return;
+        }
       }
-    }
-  }catch(e){ console.error('sync pre-merge', e); }
+    }catch(e){ console.error('sync pre-check', e); }
+  }
   state.updatedAt = Date.now();
   await docRef.set({
     lancamentos: state.lancamentos,
     potes: state.potes,
     movimentosPoupanca: state.movimentosPoupanca,
-    tombstones: state.tombstones,
     categorias: state.categorias,
     cartoes: state.cartoes,
     settings: { rendaFixa: state.settings.rendaFixa, orcamento: state.settings.orcamento, contaCorrente: state.settings.contaCorrente },
