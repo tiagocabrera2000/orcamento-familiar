@@ -3189,6 +3189,63 @@ function desconectarSync(){
   renderConfig();
 }
 
+// Bug encontrado em 2026-08-25 (parte 2): depois que o app já está aberto e
+// sincronizado, celulares costumam suspender/congelar abas em segundo plano
+// (tela bloqueada, troca de app) — e isso pode derrubar silenciosamente o
+// canal de tempo real do Firestore sem disparar nenhum evento de erro (o
+// navegador simplesmente pausa a execução do JS, então nem onSnapshot nem
+// window.onerror percebem nada). Reabrir o app do zero sempre "conserta"
+// porque o init() roda de novo — mas enquanto o app fica aberto em segundo
+// plano, ele pode ficar com um canal morto e nunca mais receber nada.
+// Por isso: sempre que a aba voltar a ficar visível, força uma reconexão e
+// também busca o documento mais recente diretamente (get(), não só o
+// listener), pra não depender só do canal de tempo real ter sobrevivido.
+function reconectarAoFicarVisivel(){
+  if(document.visibilityState !== 'visible') return;
+  if(!state.settings.firebase) return;
+  if(fbDb){
+    const cfg = state.settings.firebase;
+    const docRef = fbDb.collection('familias').doc(cfg.familyCode);
+    docRef.get().then(snap=>{
+      if(!snap.exists) return;
+      const remote = snap.data();
+      if(!remote || !remote.updatedAt) return;
+      const remoteLancamentos = remote.lancamentos || [];
+      const remotoTemMuitoMaisDados = remoteLancamentos.length > 0 && remoteLancamentos.length > state.lancamentos.length + 5;
+      if(remote.updatedAt <= state.updatedAt && !remotoTemMuitoMaisDados) return;
+      if(state.lancamentos.length > 0 && remoteLancamentos.length === 0) return;
+      state = {
+        ...state,
+        lancamentos: remote.lancamentos || [],
+        potes: remote.potes || [],
+        movimentosPoupanca: remote.movimentosPoupanca || [],
+        categorias: (remote.categorias && remote.categorias.length) ? remote.categorias : state.categorias,
+        cartoes: (remote.cartoes && remote.cartoes.length) ? remote.cartoes : state.cartoes,
+        settings: { ...state.settings, ...(remote.settings||{}) },
+        updatedAt: remote.updatedAt,
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      rebuildCategoriesFromState();
+      renderAll();
+      showToast('Dados atualizados de outro aparelho ✓');
+    }).catch(e=>console.error('reconectarAoFicarVisivel get()', e));
+  }
+  // Reabre o canal de tempo real do zero também, pra garantir que não ficou
+  // um canal morto conectado (connectFirebase() já derruba o anterior antes
+  // de abrir um novo, então isso é seguro de chamar de novo).
+  conectarComRetentativa(state.settings.firebase);
+}
+document.addEventListener('visibilitychange', reconectarAoFicarVisivel);
+window.addEventListener('pageshow', reconectarAoFicarVisivel);
+// Rede de segurança extra: mesmo com a aba visível o tempo todo, trocar de
+// wifi pra dados móveis (ou uma instabilidade momentânea) pode derrubar o
+// canal em segundo plano sem avisar. Por isso, a cada 60s com a aba visível,
+// confirma que os dados batem com a nuvem via get() direto — não depende só
+// do listener em tempo real ter sobrevivido.
+setInterval(()=>{
+  if(document.visibilityState === 'visible') reconectarAoFicarVisivel();
+}, 60000);
+
 /* =========================================================
    INIT
 ========================================================= */
