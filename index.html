@@ -3120,6 +3120,8 @@ async function connectFirebase(cfg){
     // direto via get() (não depende do canal de tempo real funcionar) e reabre
     // uma nova tentativa de conexão do zero.
     console.warn('Sync: canal de tempo real não respondeu em 15s — derrubando e tentando de novo.');
+    fbReady = false; // o selo "Sincronizado" não pode continuar mostrando um canal que confirmadamente não respondeu
+    renderAll();
     const agora = Date.now();
     if(agora - ultimoAvisoCanalTravado > 120000){ // no máximo 1 aviso a cada 2 minutos
       ultimoAvisoCanalTravado = agora;
@@ -3243,50 +3245,70 @@ function desconectarSync(){
 // Por isso: sempre que a aba voltar a ficar visível, força uma reconexão e
 // também busca o documento mais recente diretamente (get(), não só o
 // listener), pra não depender só do canal de tempo real ter sobrevivido.
+// Bug encontrado em 2026-08-25 (parte 4): a primeira versão dessa reconexão
+// derrubava e recriava o canal de tempo real (fbUnsub + connectFirebase) toda
+// vez que a aba ficava visível E também a cada 60s, incondicionalmente — sem
+// checar se o canal já estava funcionando bem. Isso criava um ciclo vicioso:
+// se o canal real (onSnapshot) demora um pouco mais que 15s pra terminar de
+// abrir em alguma rede (o que é normal, não é um travamento de verdade), essa
+// reconexão automática derrubava ele ANTES dele terminar de conectar — e
+// como isso podia se repetir a cada 60s, o canal nunca tinha chance de
+// estabilizar. Foi isso que passou a acontecer até no notebook depois dessa
+// mudança. Correção: separar em duas coisas independentes —
+// (1) buscarDadosMaisRecentes(): só LÊ os dados via get(), nunca mexe no
+//     listener — sempre seguro de chamar com qualquer frequência.
+// (2) reconectarSeCanalMorto(): só derruba/recria o listener quando temos
+//     evidência real de que ele está morto (fbReady ainda false depois de
+//     tempo suficiente) — nunca só "porque a aba ficou visível".
+function buscarDadosMaisRecentes(){
+  if(!fbDb || !state.settings.firebase) return;
+  const cfg = state.settings.firebase;
+  const docRef = fbDb.collection('familias').doc(cfg.familyCode);
+  docRef.get().then(snap=>{
+    if(!snap.exists) return;
+    const remote = snap.data();
+    if(!remote || !remote.updatedAt) return;
+    const remoteLancamentos = remote.lancamentos || [];
+    const remotoTemMuitoMaisDados = remoteLancamentos.length > 0 && remoteLancamentos.length > state.lancamentos.length + 5;
+    if(remote.updatedAt <= state.updatedAt && !remotoTemMuitoMaisDados) return;
+    if(state.lancamentos.length > 0 && remoteLancamentos.length === 0) return;
+    state = {
+      ...state,
+      lancamentos: remote.lancamentos || [],
+      potes: remote.potes || [],
+      movimentosPoupanca: remote.movimentosPoupanca || [],
+      categorias: (remote.categorias && remote.categorias.length) ? remote.categorias : state.categorias,
+      cartoes: (remote.cartoes && remote.cartoes.length) ? remote.cartoes : state.cartoes,
+      settings: { ...state.settings, ...(remote.settings||{}) },
+      updatedAt: remote.updatedAt,
+    };
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    rebuildCategoriesFromState();
+    renderAll();
+    showToast('Dados atualizados de outro aparelho ✓');
+  }).catch(e=>console.error('buscarDadosMaisRecentes get()', e));
+}
 function reconectarAoFicarVisivel(){
   if(document.visibilityState !== 'visible') return;
   if(!state.settings.firebase) return;
-  if(fbDb){
-    const cfg = state.settings.firebase;
-    const docRef = fbDb.collection('familias').doc(cfg.familyCode);
-    docRef.get().then(snap=>{
-      if(!snap.exists) return;
-      const remote = snap.data();
-      if(!remote || !remote.updatedAt) return;
-      const remoteLancamentos = remote.lancamentos || [];
-      const remotoTemMuitoMaisDados = remoteLancamentos.length > 0 && remoteLancamentos.length > state.lancamentos.length + 5;
-      if(remote.updatedAt <= state.updatedAt && !remotoTemMuitoMaisDados) return;
-      if(state.lancamentos.length > 0 && remoteLancamentos.length === 0) return;
-      state = {
-        ...state,
-        lancamentos: remote.lancamentos || [],
-        potes: remote.potes || [],
-        movimentosPoupanca: remote.movimentosPoupanca || [],
-        categorias: (remote.categorias && remote.categorias.length) ? remote.categorias : state.categorias,
-        cartoes: (remote.cartoes && remote.cartoes.length) ? remote.cartoes : state.cartoes,
-        settings: { ...state.settings, ...(remote.settings||{}) },
-        updatedAt: remote.updatedAt,
-      };
-      localStorage.setItem(LS_KEY, JSON.stringify(state));
-      rebuildCategoriesFromState();
-      renderAll();
-      showToast('Dados atualizados de outro aparelho ✓');
-    }).catch(e=>console.error('reconectarAoFicarVisivel get()', e));
+  // Sempre seguro: só lê dados, nunca mexe no canal de tempo real.
+  buscarDadosMaisRecentes();
+  // Só derruba e recria o canal se ele nunca chegou a ficar pronto — isto é,
+  // se realmente está morto. Se já está funcionando (fbReady true), não mexe.
+  if(!fbReady){
+    conectarComRetentativa(state.settings.firebase);
   }
-  // Reabre o canal de tempo real do zero também, pra garantir que não ficou
-  // um canal morto conectado (connectFirebase() já derruba o anterior antes
-  // de abrir um novo, então isso é seguro de chamar de novo).
-  conectarComRetentativa(state.settings.firebase);
 }
 document.addEventListener('visibilitychange', reconectarAoFicarVisivel);
 window.addEventListener('pageshow', reconectarAoFicarVisivel);
 // Rede de segurança extra: mesmo com a aba visível o tempo todo, trocar de
 // wifi pra dados móveis (ou uma instabilidade momentânea) pode derrubar o
 // canal em segundo plano sem avisar. Por isso, a cada 60s com a aba visível,
-// confirma que os dados batem com a nuvem via get() direto — não depende só
-// do listener em tempo real ter sobrevivido.
+// confirma que os dados batem com a nuvem via get() direto — sem nunca tocar
+// no listener em tempo real (só reconectarAoFicarVisivel/timeout fazem isso,
+// e só quando há evidência real de que o canal está morto).
 setInterval(()=>{
-  if(document.visibilityState === 'visible') reconectarAoFicarVisivel();
+  if(document.visibilityState === 'visible') buscarDadosMaisRecentes();
 }, 60000);
 
 /* =========================================================
