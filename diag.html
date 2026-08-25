@@ -74,12 +74,35 @@ function setResult(div, ok, detail){
     }
   } catch(e) { setResult(t3, false, String(e) + (e.stack ? '\n'+e.stack.slice(0,300) : '')); }
 
-  // Teste 4: WebChannel do Firestore (o que o SDK realmente usa pra sincronizar em tempo real)
-  const t4 = addItem('t4', 'Canal de tempo real do Firestore (o que trava a sincronização de verdade)');
+  // Teste 4: o SDK de verdade do Firebase tentando abrir o canal de tempo real
+  // (o mesmo mecanismo que o app usa) — com um limite de 12s pra não travar pra sempre.
+  const t4 = addItem('t4', 'Canal de tempo real do Firestore (o SDK de verdade, como o app usa)');
   try {
-    const url = `https://firestore.googleapis.com/google.firestore.v1.Firestore/Listen/channel?VER=8&database=projects%2F${CFG.projectId}%2Fdatabases%2F(default)&RID=12345&CVER=22&X-HTTP-Session-Id=gsessionid&zx=abc123&t=1`;
-    const r = await fetch(url, { method: 'OPTIONS' });
-    setResult(t4, true, 'status ' + r.status + ' (conseguiu alcançar o endpoint)');
+    await new Promise((resolve, reject) => {
+      const s1 = document.createElement('script');
+      s1.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js';
+      s1.onload = () => {
+        const s2 = document.createElement('script');
+        s2.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js';
+        s2.onload = () => resolve();
+        s2.onerror = () => reject(new Error('falhou ao carregar firebase-firestore-compat.js'));
+        document.head.appendChild(s2);
+      };
+      s1.onerror = () => reject(new Error('falhou ao carregar firebase-app-compat.js'));
+      document.head.appendChild(s1);
+    });
+    const app = firebase.initializeApp({ apiKey: CFG.apiKey, projectId: CFG.projectId, appId: 'diag' }, 'diagApp');
+    const db = firebase.firestore(app);
+    const docRef = db.collection('familias').doc(CFG.familyCode);
+    const resultado = await new Promise((resolve) => {
+      let done = false;
+      const timeout = setTimeout(() => { if(!done){ done = true; resolve({ok:false, msg:'TIMEOUT depois de 12s — o SDK nunca conseguiu abrir o canal de tempo real. É exatamente esse travamento que impede a sincronização.'}); } }, 12000);
+      const unsub = docRef.onSnapshot(
+        snap => { if(!done){ done = true; clearTimeout(timeout); unsub(); resolve({ok:true, msg:'Snapshot recebido! lançamentos: ' + ((snap.data()||{}).lancamentos||[]).length}); } },
+        err => { if(!done){ done = true; clearTimeout(timeout); resolve({ok:false, msg:'Erro do SDK: ' + err.code + ' — ' + err.message}); } }
+      );
+    });
+    setResult(t4, resultado.ok, resultado.msg);
   } catch(e) { setResult(t4, false, String(e)); }
 
   const info = document.createElement('div');
