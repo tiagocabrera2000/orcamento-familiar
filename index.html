@@ -582,6 +582,27 @@ function showToast(msg){
   clearTimeout(showToast._t);
   showToast._t = setTimeout(()=>t.classList.remove('show'), 2600);
 }
+// Banner de erro persistente (não some sozinho, diferente do toast) — usado
+// só pra diagnóstico temporário do bug de sincronização de 2026-08-25.
+// Mostra o erro real na tela pra dar pra tirar print, já que não dá pra ver
+// o console do navegador no celular.
+function mostrarErroDiagnostico(msg){
+  let el = document.getElementById('erroDiagnostico');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'erroDiagnostico';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#c0392b;color:#fff;padding:14px;font-size:13px;font-family:monospace;white-space:pre-wrap;word-break:break-all;max-height:40vh;overflow:auto;';
+    document.body.appendChild(el);
+  }
+  const hora = new Date().toLocaleTimeString('pt-BR');
+  el.textContent = '[' + hora + '] ' + msg + (el.textContent ? '\n\n---\n' + el.textContent : '');
+}
+window.addEventListener('error', e=>{
+  mostrarErroDiagnostico('Erro não tratado: ' + e.message + ' (' + (e.filename||'') + ':' + (e.lineno||'') + ')');
+});
+window.addEventListener('unhandledrejection', e=>{
+  mostrarErroDiagnostico('Promise rejeitada: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)));
+});
 
 /* =========================================================
    CÁLCULOS DE ORÇAMENTO
@@ -3009,34 +3030,39 @@ async function connectFirebase(cfg){
   const docRef = fbDb.collection('familias').doc(cfg.familyCode);
   if(fbUnsub) fbUnsub();
   fbUnsub = docRef.onSnapshot(snap=>{
-    if(!snap.exists) return;
-    const remote = snap.data();
-    if(!remote || !remote.updatedAt) return;
-    if(remote.updatedAt <= state.updatedAt) return;
-    const remoteLancamentos = remote.lancamentos || [];
-    // Rede de segurança (v5.1): nunca aceitar cegamente um remoto que
-    // apagaria TUDO que temos localmente — sinal de aparelho com
-    // armazenamento vazio/corrompido tendo empurrado um estado vazio.
-    if(state.lancamentos.length > 0 && remoteLancamentos.length === 0){
-      console.warn('Sync: ignorando snapshot remoto vazio para não apagar lançamentos locais. Reenviando estado local.');
-      syncPush().catch(e=>console.error('sync re-push', e));
-      return;
+    try{
+      if(!snap.exists) return;
+      const remote = snap.data();
+      if(!remote || !remote.updatedAt) return;
+      if(remote.updatedAt <= state.updatedAt) return;
+      const remoteLancamentos = remote.lancamentos || [];
+      // Rede de segurança (v5.1): nunca aceitar cegamente um remoto que
+      // apagaria TUDO que temos localmente — sinal de aparelho com
+      // armazenamento vazio/corrompido tendo empurrado um estado vazio.
+      if(state.lancamentos.length > 0 && remoteLancamentos.length === 0){
+        console.warn('Sync: ignorando snapshot remoto vazio para não apagar lançamentos locais. Reenviando estado local.');
+        syncPush().catch(e=>console.error('sync re-push', e));
+        return;
+      }
+      state = {
+        ...state,
+        lancamentos: remote.lancamentos || [],
+        potes: remote.potes || [],
+        movimentosPoupanca: remote.movimentosPoupanca || [],
+        categorias: (remote.categorias && remote.categorias.length) ? remote.categorias : state.categorias,
+        cartoes: (remote.cartoes && remote.cartoes.length) ? remote.cartoes : state.cartoes,
+        settings: { ...state.settings, ...(remote.settings||{}) },
+        updatedAt: remote.updatedAt,
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      rebuildCategoriesFromState();
+      renderAll();
+      showToast('Dados atualizados de outro aparelho ✓');
+    }catch(e){
+      console.error('onSnapshot handler error', e);
+      mostrarErroDiagnostico('Erro ao aplicar dados recebidos: ' + e.message);
     }
-    state = {
-      ...state,
-      lancamentos: remote.lancamentos || [],
-      potes: remote.potes || [],
-      movimentosPoupanca: remote.movimentosPoupanca || [],
-      categorias: (remote.categorias && remote.categorias.length) ? remote.categorias : state.categorias,
-      cartoes: (remote.cartoes && remote.cartoes.length) ? remote.cartoes : state.cartoes,
-      settings: { ...state.settings, ...(remote.settings||{}) },
-      updatedAt: remote.updatedAt,
-    };
-    localStorage.setItem(LS_KEY, JSON.stringify(state));
-    rebuildCategoriesFromState();
-    renderAll();
-    showToast('Dados atualizados de outro aparelho ✓');
-  }, err=>{ console.error(err); showToast('Erro de sincronização — verifique a configuração'); });
+  }, err=>{ console.error(err); mostrarErroDiagnostico('Erro de sincronização (onSnapshot): ' + err.code + ' — ' + err.message); });
   fbReady = true;
   renderAll();
 }
