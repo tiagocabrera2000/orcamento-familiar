@@ -535,10 +535,39 @@ function saveState(opts={}){
   renderAll();
 }
 let pushTimer = null;
+let pushPendente = false; // true quando há alterações locais que ainda não foram confirmadas na nuvem
+let ultimoAvisoFalhaPush = 0;
+// Bug encontrado em 2026-08-25 (parte 5): syncPushDebounced() desistia
+// silenciosamente se fbReady estivesse false no momento do saveState() (ex:
+// bem no meio de uma reconexão) — e como só é chamado de dentro de saveState(),
+// aquele lançamento específico nunca mais era reenviado sozinho. Também não
+// havia nenhum aviso visível se docRef.set() falhasse (erro de permissão,
+// rede, etc) — só um console.error que ninguém vê no dia a dia, nem no
+// notebook. Foi assim que a nuvem ficou 4h desatualizada sem nenhum sinal.
+// Agora: toda alteração marca pushPendente=true, e isso só volta a false
+// depois de um push confirmado com sucesso — então nada fica "esquecido" e
+// falhas silenciosas passam a mostrar um aviso.
 function syncPushDebounced(){
-  if(!fbReady) return;
+  pushPendente = true;
+  if(!fbReady) return; // sem conexão agora, mas pushPendente garante que tenta de novo quando reconectar
   clearTimeout(pushTimer);
-  pushTimer = setTimeout(()=>{ syncPush().catch(e=>console.error('sync push', e)); }, 900);
+  pushTimer = setTimeout(tentarSyncPush, 900);
+}
+async function tentarSyncPush(){
+  if(!fbReady || !state.settings.firebase) return;
+  try{
+    await syncPush();
+    pushPendente = false;
+  }catch(e){
+    console.error('sync push', e);
+    const agora = Date.now();
+    if(agora - ultimoAvisoFalhaPush > 120000){
+      ultimoAvisoFalhaPush = agora;
+      mostrarErroDiagnostico('Não consegui enviar suas últimas alterações pra nuvem: ' + (e && e.message ? e.message : String(e)) + '. Vou continuar tentando.');
+    }
+    // pushPendente continua true — a próxima checagem (visibilidade, 60s, ou
+    // reconexão) vai tentar de novo.
+  }
 }
 
 /* =========================================================
@@ -3048,9 +3077,20 @@ async function connectFirebase(cfg){
     try{
       primeiroSnapshotRecebido = true;
       fbReady = true;
+      // Assim que a conexão volta a ficar saudável, tenta mandar imediatamente
+      // qualquer alteração local que ficou pendente enquanto estava desconectado
+      // — sem esperar o próximo ciclo de 60s.
+      if(pushPendente) tentarSyncPush();
       if(!snap.exists){ renderAll(); return; }
       const remote = snap.data();
       if(!remote || !remote.updatedAt){ renderAll(); return; }
+      // Mesma proteção de buscarDadosMaisRecentes(): se ainda há uma alteração
+      // local não confirmada na nuvem, não aceita o snapshot agora — senão
+      // corre o risco de perder essa alteração. O push pendente vai ser
+      // reenviado assim que possível (ver tentarSyncPush/sincronizarAgora), e
+      // o snapshot seguinte (depois do nosso próprio push) vai refletir tudo
+      // certo.
+      if(pushPendente){ renderAll(); return; }
       const remoteLancamentos = remote.lancamentos || [];
       // Bug encontrado em 2026-08-25: comparar só por timestamp (updatedAt) é
       // perigoso, porque um saveState() local totalmente inofensivo (ex: gerar
@@ -3262,6 +3302,12 @@ function desconectarSync(){
 //     tempo suficiente) — nunca só "porque a aba ficou visível".
 function buscarDadosMaisRecentes(){
   if(!fbDb || !state.settings.firebase) return;
+  // Nunca sobrescreve o estado local se ainda existe uma alteração local que
+  // não foi confirmada na nuvem — senão a gente perde essa alteração. Quem
+  // chama essa função na sequência certa (sincronizarAgora) já tenta enviar
+  // o pendente antes de chegar aqui, mas essa checagem é uma segunda camada
+  // de segurança caso a função seja chamada de outro lugar no futuro.
+  if(pushPendente){ console.warn('buscarDadosMaisRecentes: pulando pull, há um push local pendente.'); return; }
   const cfg = state.settings.firebase;
   const docRef = fbDb.collection('familias').doc(cfg.familyCode);
   docRef.get().then(snap=>{
@@ -3288,11 +3334,25 @@ function buscarDadosMaisRecentes(){
     showToast('Dados atualizados de outro aparelho ✓');
   }).catch(e=>console.error('buscarDadosMaisRecentes get()', e));
 }
+// Bug encontrado em 2026-08-25 (parte 5, continuação): se tem um push
+// pendente (alteração local ainda não confirmada na nuvem) e a gente faz um
+// pull (buscarDadosMaisRecentes) antes de mandar esse push, corre o risco de
+// sobrescrever a alteração local que ainda não chegou na nuvem. Por isso,
+// sempre tenta enviar o que está pendente PRIMEIRO, e só depois busca
+// atualizações — nessa ordem.
+function sincronizarAgora(){
+  if(!state.settings.firebase) return;
+  const depoisDoPush = () => buscarDadosMaisRecentes();
+  if(pushPendente && fbReady){
+    tentarSyncPush().then(depoisDoPush);
+  } else {
+    depoisDoPush();
+  }
+}
 function reconectarAoFicarVisivel(){
   if(document.visibilityState !== 'visible') return;
   if(!state.settings.firebase) return;
-  // Sempre seguro: só lê dados, nunca mexe no canal de tempo real.
-  buscarDadosMaisRecentes();
+  sincronizarAgora();
   // Só derruba e recria o canal se ele nunca chegou a ficar pronto — isto é,
   // se realmente está morto. Se já está funcionando (fbReady true), não mexe.
   if(!fbReady){
@@ -3304,11 +3364,12 @@ window.addEventListener('pageshow', reconectarAoFicarVisivel);
 // Rede de segurança extra: mesmo com a aba visível o tempo todo, trocar de
 // wifi pra dados móveis (ou uma instabilidade momentânea) pode derrubar o
 // canal em segundo plano sem avisar. Por isso, a cada 60s com a aba visível,
-// confirma que os dados batem com a nuvem via get() direto — sem nunca tocar
-// no listener em tempo real (só reconectarAoFicarVisivel/timeout fazem isso,
-// e só quando há evidência real de que o canal está morto).
+// confirma que os dados batem com a nuvem (enviando o que estiver pendente
+// primeiro) — sem nunca tocar no listener em tempo real (só
+// reconectarAoFicarVisivel/timeout fazem isso, e só quando há evidência real
+// de que o canal está morto).
 setInterval(()=>{
-  if(document.visibilityState === 'visible') buscarDadosMaisRecentes();
+  if(document.visibilityState === 'visible') sincronizarAgora();
 }, 60000);
 
 /* =========================================================
