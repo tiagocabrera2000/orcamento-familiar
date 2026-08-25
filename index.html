@@ -3050,8 +3050,26 @@ async function connectFirebase(cfg){
       if(!snap.exists){ renderAll(); return; }
       const remote = snap.data();
       if(!remote || !remote.updatedAt){ renderAll(); return; }
-      if(remote.updatedAt <= state.updatedAt){ renderAll(); return; }
       const remoteLancamentos = remote.lancamentos || [];
+      // Bug encontrado em 2026-08-25: comparar só por timestamp (updatedAt) é
+      // perigoso, porque um saveState() local totalmente inofensivo (ex: gerar
+      // as próximas ocorrências de uma recorrência indeterminada, chamado no
+      // início do app antes mesmo do Firebase conectar) carimba state.updatedAt
+      // com Date.now() — um horário "mais novo" que o do último sync real —
+      // MESMO quando o conteúdo local está vazio/desatualizado (ex: aparelho
+      // que teve o armazenamento limpo). Isso fazia o snapshot remoto, correto
+      // e completo, ser descartado silenciosamente pela checagem de timestamp,
+      // travando a sincronização pra sempre nesse aparelho (nada dava erro,
+      // porque não era um erro — era a lógica de "mais recente vence" fazendo
+      // exatamente o que foi programada pra fazer, só que com premissa errada).
+      // Por isso: se o remoto tem MUITO mais lançamentos que o local, aceita o
+      // remoto mesmo que o timestamp local pareça mais novo — quantidade de
+      // dados reais importa mais que o relógio nesse caso.
+      const remotoTemMuitoMaisDados = remoteLancamentos.length > 0 && remoteLancamentos.length > state.lancamentos.length + 5;
+      if(remote.updatedAt <= state.updatedAt && !remotoTemMuitoMaisDados){ renderAll(); return; }
+      if(remotoTemMuitoMaisDados && remote.updatedAt <= state.updatedAt){
+        console.warn('Sync: aceitando snapshot remoto com timestamp mais antigo porque tem muito mais dados que o local (' + remoteLancamentos.length + ' vs ' + state.lancamentos.length + ') — provável estado local vazio/desatualizado.');
+      }
       // Rede de segurança (v5.1): nunca aceitar cegamente um remoto que
       // apagaria TUDO que temos localmente — sinal de aparelho com
       // armazenamento vazio/corrompido tendo empurrado um estado vazio.
