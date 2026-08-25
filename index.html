@@ -1577,7 +1577,17 @@ function salvarLancamentoRapido(){
       ...campoBase, forma: formaLabel, formaTipo, cartaoId, data: dataLanc,
       dataCaixa: calcularDataCaixa(formaTipo, dataLanc, 0, boletoVenc, cartaoId), mesRef,
       origem:'manual', anexoNome: ui.quickAnexo?.nome||null, anexoData: ui.quickAnexo?.data||null,
-      recorrenciaIndice: recorrencia!=='pontual' ? 0 : undefined,
+      // Bug encontrado em 2026-08-25 (parte 6, causa raiz final): esse campo
+      // usava "undefined" pra lançamentos pontuais (a maioria dos lançamentos
+      // do dia a dia). Firestore recusa QUALQUER escrita que contenha um campo
+      // com valor undefined em qualquer lugar do documento — rejeita o
+      // set() inteiro, mesmo os outros lançamentos válidos, com o erro
+      // "Unsupported field value: undefined". Foi essa a causa raiz de a
+      // nuvem ficar sem atualizar: bastava UM lançamento pontual novo pra
+      // travar o envio de tudo, silenciosamente (só apareceu quando a faixa
+      // de erro visível foi adicionada). "null" tem o mesmo significado de
+      // "não é uma ocorrência de recorrência" e o Firestore aceita numa boa.
+      recorrenciaIndice: recorrencia!=='pontual' ? 0 : null,
       criadoEm: Date.now(),
     };
     state.lancamentos.push(semente);
@@ -3222,7 +3232,7 @@ async function syncPush(){
     }catch(e){ console.error('sync pre-check', e); }
   }
   state.updatedAt = Date.now();
-  await docRef.set({
+  const payload = {
     lancamentos: state.lancamentos,
     potes: state.potes,
     movimentosPoupanca: state.movimentosPoupanca,
@@ -3230,7 +3240,21 @@ async function syncPush(){
     cartoes: state.cartoes,
     settings: { rendaFixa: state.settings.rendaFixa, orcamento: state.settings.orcamento, contaCorrente: state.settings.contaCorrente },
     updatedAt: state.updatedAt,
-  }, { merge: true });
+  };
+  // Bug encontrado em 2026-08-25 (causa raiz final, parte 6): o Firestore
+  // recusa a escrita INTEIRA se qualquer campo, em qualquer lugar do objeto,
+  // for "undefined" (é diferente de null — undefined não é um valor de dados
+  // válido no Firestore). Um único campo assim (ex: recorrenciaIndice de um
+  // lançamento pontual, já corrigido pra usar null) travava o envio de TODOS
+  // os lançamentos, silenciosamente, sem nenhum aviso — foi essa a causa raiz
+  // de a nuvem ficar horas desatualizada. Além de corrigir a origem desse
+  // campo específico, sanitiza aqui também, como rede de segurança geral:
+  // limpa qualquer "undefined" perdido (inclusive em dados antigos já salvos
+  // localmente antes dessa correção, que ainda podem ter o campo quebrado) e
+  // troca por null antes de mandar pra nuvem — nunca deixa uma única falha de
+  // dado bloquear a sincronização de tudo o resto de novo.
+  const payloadLimpo = JSON.parse(JSON.stringify(payload, (key, value) => value === undefined ? null : value));
+  await docRef.set(payloadLimpo, { merge: true });
 }
 // Conecta ao Firebase na abertura do app. Se falhar (ex: script do Firebase não
 // carregou por causa de rede instável no celular), tenta mais 2 vezes com um
